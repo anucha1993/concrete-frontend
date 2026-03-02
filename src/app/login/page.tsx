@@ -50,6 +50,7 @@ function LoginForm() {
           <h2 className="mb-6 text-lg font-semibold text-gray-800">เข้าสู่ระบบ</h2>
           <p>User : admin@stockconcrete.com</p>
           <p>password : password</p>
+          <br />
 
           {error && (
             <div className="mb-4 rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-600">
