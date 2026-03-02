@@ -102,17 +102,19 @@ function LabelsContent() {
       )}
 
       {/* Tabs */}
-      <div className="mb-6 flex border-b">
-        {tabs.map(tab => (
-          <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
-              activeTab === tab.key
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}>
-            {tab.icon} {tab.label}
-          </button>
-        ))}
+      <div className="mb-6 -mx-4 sm:mx-0 overflow-x-auto">
+        <div className="flex border-b min-w-max px-4 sm:px-0">
+          {tabs.map(tab => (
+            <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+              className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 text-xs sm:text-sm font-medium transition-colors border-b-2 -mb-px whitespace-nowrap ${
+                activeTab === tab.key
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}>
+              {tab.icon} {tab.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {activeTab === 'print' && <PrintTab canManage={canManage} onPrinted={fetchStats} />}
@@ -126,11 +128,11 @@ function LabelsContent() {
 /* ── Stat Card ── */
 function StatCard({ label, value, icon }: { label: string; value: number; icon: React.ReactNode }) {
   return (
-    <div className="flex items-center gap-3 rounded-xl border bg-white p-4 shadow-sm">
-      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-50">{icon}</div>
-      <div>
-        <p className="text-xl font-bold">{value.toLocaleString()}</p>
-        <p className="text-xs text-gray-500">{label}</p>
+    <div className="flex items-center gap-2 sm:gap-3 rounded-xl border bg-white p-3 sm:p-4 shadow-sm">
+      <div className="flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-lg bg-gray-50">{icon}</div>
+      <div className="min-w-0">
+        <p className="text-lg sm:text-xl font-bold">{value.toLocaleString()}</p>
+        <p className="text-[10px] sm:text-xs text-gray-500 leading-tight">{label}</p>
       </div>
     </div>
   );
@@ -264,17 +266,21 @@ function POListView({ onSelect }: { onSelect: (id: number) => void }) {
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-end gap-3">
-        <form onSubmit={handleSearchSubmit} className="flex gap-2">
-          <div className="relative">
+        <form onSubmit={handleSearchSubmit} className="flex gap-2 w-full sm:w-auto">
+          <div className="relative flex-1 sm:flex-none">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input type="text" placeholder="ค้นหาเลขที่ใบสั่งผลิต..." value={search} onChange={e => setSearch(e.target.value)}
-              className="rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm focus:border-blue-500 focus:outline-none" />
+              className="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm focus:border-blue-500 focus:outline-none" />
           </div>
-          <button type="submit" className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200">ค้นหา</button>
+          <button type="submit" className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 shrink-0">ค้นหา</button>
         </form>
       </div>
 
-      <DataTable columns={columns} data={orders} loading={loading} emptyMessage="ไม่มีรายการใบสั่งผลิต" />
+      <div className="overflow-x-auto -mx-4 sm:mx-0">
+        <div className="min-w-[700px] px-4 sm:px-0">
+          <DataTable columns={columns} data={orders} loading={loading} emptyMessage="ไม่มีรายการใบสั่งผลิต" />
+        </div>
+      </div>
       <Pagination currentPage={meta.current_page} lastPage={meta.last_page} total={meta.total} onPageChange={setPage} />
     </div>
   );
@@ -470,15 +476,15 @@ function POSerialView({ poId, canManage, onBack, onPrinted }: {
   return (
     <div>
       {/* Header with back button */}
-      <div className="mb-4 flex items-center gap-3">
-        <button onClick={onBack} className="flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+      <div className="mb-4 flex flex-wrap items-center gap-2 sm:gap-3">
+        <button onClick={onBack} className="flex items-center gap-1 rounded-lg border border-gray-300 px-2.5 sm:px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
           <ArrowLeft size={16} /> กลับ
         </button>
         {poInfo && (
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <div className="flex items-center gap-2">
               <Package size={18} className="text-blue-600" />
-              <span className="text-lg font-bold text-gray-800">{poInfo.order_number}</span>
+              <span className="text-base sm:text-lg font-bold text-gray-800">{poInfo.order_number}</span>
             </div>
             <Badge variant={poInfo.status === 'COMPLETED' ? 'success' : poInfo.status === 'IN_PROGRESS' ? 'warning' : 'gray'}>
               {poInfo.status === 'COMPLETED' ? 'เสร็จสิ้น' : poInfo.status === 'IN_PROGRESS' ? 'กำลังผลิต' : poInfo.status === 'CONFIRMED' ? 'ยืนยันแล้ว' : 'แบบร่าง'}
@@ -511,26 +517,28 @@ function POSerialView({ poId, canManage, onBack, onPrinted }: {
       )}
 
       {/* Filters + Actions */}
-      <div className="mb-4 flex flex-wrap items-end gap-3">
-        <form onSubmit={handleSearchSubmit} className="flex gap-2">
-          <div className="relative">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input type="text" placeholder="ค้นหา serial..." value={search} onChange={e => setSearch(e.target.value)}
-              className="rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm focus:border-blue-500 focus:outline-none" />
-          </div>
-          <button type="submit" className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200">ค้นหา</button>
-        </form>
+      <div className="mb-4 space-y-3">
+        <div className="flex flex-wrap items-end gap-3">
+          <form onSubmit={handleSearchSubmit} className="flex gap-2 w-full sm:w-auto">
+            <div className="relative flex-1 sm:flex-none">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input type="text" placeholder="ค้นหา serial..." value={search} onChange={e => setSearch(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm focus:border-blue-500 focus:outline-none" />
+            </div>
+            <button type="submit" className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 shrink-0">ค้นหา</button>
+          </form>
 
-        <select value={labelStatus} onChange={e => { setLabelStatus(e.target.value); setPage(1); }}
-          className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none">
-          <option value="">ทุกสถานะ</option>
-          <option value="not_printed">ยังไม่ปริ้น</option>
-          <option value="printed">ปริ้นแล้ว</option>
-          <option value="verified">ยืนยันแล้ว</option>
-        </select>
+          <select value={labelStatus} onChange={e => { setLabelStatus(e.target.value); setPage(1); }}
+            className="w-full sm:w-auto rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none">
+            <option value="">ทุกสถานะ</option>
+            <option value="not_printed">ยังไม่ปริ้น</option>
+            <option value="printed">ปริ้นแล้ว</option>
+            <option value="verified">ยืนยันแล้ว</option>
+          </select>
+        </div>
 
-        <div className="ml-auto flex items-end gap-3">
-          <div>
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="w-full sm:w-auto">
             <label className="mb-1 block text-xs text-gray-500">รูปแบบ Label</label>
             <select value={labelTemplate} onChange={e => {
               const val = e.target.value as LabelTemplateChoice;
@@ -547,7 +555,7 @@ function POSerialView({ poId, canManage, onBack, onPrinted }: {
                 }
               }
             }}
-              className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none">
+              className="w-full sm:w-auto rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none">
               <option value="" disabled>เลือก Template</option>
               {customTemplates.map(t => (
                 <option key={t.id} value={`custom:${t.id}`}>
@@ -556,12 +564,12 @@ function POSerialView({ poId, canManage, onBack, onPrinted }: {
               ))}
             </select>
           </div>
-          <div>
+          <div className="w-full sm:w-auto">
             <label className="mb-1 block text-xs text-gray-500">ขนาดกระดาษ</label>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <select value={paperSize} onChange={e => setPaperSize(e.target.value)}
                 disabled={!!selectedCustomTemplate}
-                className={`rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none ${selectedCustomTemplate ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}>
+                className={`w-full sm:w-auto rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none ${selectedCustomTemplate ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}>
                 {PAPER_SIZES.map(ps => <option key={ps.value} value={ps.value}>{ps.label}</option>)}
               </select>
               {paperSize === 'custom' && (
@@ -583,18 +591,20 @@ function POSerialView({ poId, canManage, onBack, onPrinted }: {
               )}
             </div>
           </div>
-          {canManage && canPrint && unprintedCount > 0 && (
-            <button onClick={openPreviewAll}
-              className="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50">
-              <Eye size={16} /> ปริ้นทั้งใบ ({unprintedCount})
-            </button>
-          )}
-          {canManage && canPrint && (
-            <button onClick={openPreviewSelected} disabled={selected.size === 0}
-              className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
-              <Eye size={16} /> ปริ้นที่เลือก ({selected.size})
-            </button>
-          )}
+          <div className="flex w-full sm:w-auto sm:ml-auto gap-2">
+            {canManage && canPrint && unprintedCount > 0 && (
+              <button onClick={openPreviewAll}
+                className="flex-1 sm:flex-none flex items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50">
+                <Eye size={16} /> <span className="hidden sm:inline">ปริ้นทั้งใบ</span><span className="sm:hidden">ทั้งใบ</span> ({unprintedCount})
+              </button>
+            )}
+            {canManage && canPrint && (
+              <button onClick={openPreviewSelected} disabled={selected.size === 0}
+                className="flex-1 sm:flex-none flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+                <Eye size={16} /> <span className="hidden sm:inline">ปริ้นที่เลือก</span><span className="sm:hidden">ที่เลือก</span> ({selected.size})
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -609,7 +619,11 @@ function POSerialView({ poId, canManage, onBack, onPrinted }: {
         </div>
       )}
 
-      <DataTable columns={columns} data={items} loading={loading} emptyMessage="ไม่มี serial ในใบสั่งผลิตนี้" />
+      <div className="overflow-x-auto -mx-4 sm:mx-0">
+        <div className="min-w-[600px] px-4 sm:px-0">
+          <DataTable columns={columns} data={items} loading={loading} emptyMessage="ไม่มี serial ในใบสั่งผลิตนี้" />
+        </div>
+      </div>
       <Pagination currentPage={meta.current_page} lastPage={meta.last_page} total={meta.total} onPageChange={setPage} />
 
       {/* Print Preview Modal */}
@@ -951,23 +965,23 @@ function PrintPreviewModal({ items, paperSize, customTemplateData, printing, onC
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
-      <div className="mx-4 flex max-h-[90vh] w-full max-w-4xl flex-col rounded-2xl bg-white shadow-xl" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50" onClick={onClose}>
+      <div className="flex max-h-[95vh] sm:max-h-[90vh] w-full max-w-4xl flex-col rounded-t-2xl sm:rounded-2xl bg-white shadow-xl sm:mx-4" onClick={e => e.stopPropagation()}>
         {/* Header */}
-        <div className="flex items-center justify-between border-b px-6 py-4">
-          <div>
-            <h2 className="text-lg font-bold text-gray-800">ตัวอย่าง Label ก่อนปริ้น</h2>
-            <p className="text-sm text-gray-500">
-              {items.length} รายการ | {templateLabel} | ขนาดกระดาษ: {paperLabel} | ใบสั่งผลิต: {poOrderNumber}
+        <div className="flex items-start sm:items-center justify-between border-b px-4 sm:px-6 py-3 sm:py-4">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-base sm:text-lg font-bold text-gray-800">ตัวอย่าง Label ก่อนปริ้น</h2>
+            <p className="text-xs sm:text-sm text-gray-500 break-words">
+              {items.length} รายการ | {templateLabel} | {paperLabel} | {poOrderNumber}
             </p>
           </div>
-          <button onClick={onClose} className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+          <button onClick={onClose} className="ml-2 shrink-0 rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
             <X size={20} />
           </button>
         </div>
 
         {/* Preview grid */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
           {/* Admin reprint warning */}
           {hasReprints && isAdmin && (
             <div className="mb-4 rounded-lg border border-orange-200 bg-orange-50 p-4">
@@ -1041,14 +1055,14 @@ function PrintPreviewModal({ items, paperSize, customTemplateData, printing, onC
         </div>
 
         {/* Footer actions */}
-        <div className="flex items-center justify-between border-t px-6 py-4">
+        <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2 border-t px-4 sm:px-6 py-3 sm:py-4">
           <button onClick={onClose}
             className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
             ยกเลิก
           </button>
           <button onClick={handleConfirmAndPrint}
             disabled={printing}
-            className="flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+            className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-6 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
             <Printer size={16} /> {printing ? 'กำลังบันทึก...' : `ยืนยันและปริ้น (${items.length})`}
           </button>
         </div>
@@ -1106,14 +1120,14 @@ function VerifyTab({ canManage, onVerified }: { canManage: boolean; onVerified: 
 
   return (
     <div className="space-y-6">
-      <div className="mx-auto max-w-lg rounded-xl border bg-white p-6 shadow-sm">
+      <div className="mx-auto max-w-lg rounded-xl border bg-white p-4 sm:p-6 shadow-sm">
         <div className="mb-4 text-center">
           <ScanBarcode size={48} className="mx-auto mb-2 text-blue-500" />
           <h3 className="text-lg font-semibold">ยิง PDA เพื่อยืนยันติด Label</h3>
           <p className="text-sm text-gray-500">สแกน barcode บนสินค้าเพื่อยืนยันว่าติด label แล้ว</p>
         </div>
 
-        <form onSubmit={handleVerify} className="flex gap-2">
+        <form onSubmit={handleVerify} className="flex flex-col sm:flex-row gap-2">
           <input
             id="verify-input"
             type="text"
@@ -1135,7 +1149,26 @@ function VerifyTab({ canManage, onVerified }: { canManage: boolean; onVerified: 
       {recentVerified.length > 0 && (
         <div>
           <h4 className="mb-2 text-sm font-semibold text-gray-700">รายการสแกนล่าสุด</h4>
-          <div className="max-h-80 overflow-y-auto rounded-lg border">
+
+          {/* Mobile card view */}
+          <div className="sm:hidden space-y-2 max-h-80 overflow-y-auto">
+            {recentVerified.map((r, i) => (
+              <div key={i} className={`rounded-lg border p-3 ${r.ok ? 'bg-white' : 'bg-red-50 border-red-200'}`}>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-mono text-xs font-medium">{r.serial}</span>
+                  <Badge variant={r.ok ? 'success' : 'danger'}>{r.ok ? 'สำเร็จ' : 'ล้มเหลว'}</Badge>
+                </div>
+                <div className="text-xs text-gray-500">{r.product}</div>
+                <div className="flex items-center justify-between mt-1">
+                  <span className="text-[10px] text-gray-400">{r.time}</span>
+                  <span className="text-[10px] text-gray-400">{r.msg}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop table view */}
+          <div className="hidden sm:block max-h-80 overflow-y-auto rounded-lg border">
             <table className="w-full text-sm">
               <thead className="sticky top-0 bg-gray-50">
                 <tr>
@@ -1236,21 +1269,25 @@ function HistoryTab() {
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-end gap-3">
-        <div className="relative">
+        <div className="relative flex-1 sm:flex-none">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input type="text" placeholder="ค้นหา serial..." value={search}
             onChange={e => { setSearch(e.target.value); setPage(1); }}
-            className="rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm focus:border-blue-500 focus:outline-none" />
+            className="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm focus:border-blue-500 focus:outline-none" />
         </div>
         <select value={printType} onChange={e => { setPrintType(e.target.value); setPage(1); }}
-          className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none">
+          className="w-full sm:w-auto rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none">
           <option value="">ทุกประเภท</option>
           <option value="FIRST">ปริ้นครั้งแรก</option>
           <option value="REPRINT">ปริ้นซ้ำ</option>
         </select>
       </div>
 
-      <DataTable columns={columns} data={logs} loading={loading} emptyMessage="ไม่มีประวัติการปริ้น" />
+      <div className="overflow-x-auto -mx-4 sm:mx-0">
+        <div className="min-w-[700px] px-4 sm:px-0">
+          <DataTable columns={columns} data={logs} loading={loading} emptyMessage="ไม่มีประวัติการปริ้น" />
+        </div>
+      </div>
       <Pagination currentPage={meta.current_page} lastPage={meta.last_page} total={meta.total} onPageChange={setPage} />
     </div>
   );
@@ -1358,7 +1395,7 @@ function PdaTokenTab() {
       </div>
 
       {/* Create token */}
-      <div className="flex items-end gap-3 rounded-xl border bg-white p-4 shadow-sm">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-3 rounded-xl border bg-white p-4 shadow-sm">
         <div className="flex-1">
           <label className="mb-1 block text-sm font-medium text-gray-700">ชื่อ / หมายเหตุ (ไม่จำเป็น)</label>
           <input type="text" value={name} onChange={e => setName(e.target.value)}
@@ -1366,7 +1403,7 @@ function PdaTokenTab() {
             className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none" />
         </div>
         <button onClick={handleCreate} disabled={creating}
-          className="flex shrink-0 items-center gap-1.5 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50">
+          className="flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50">
           <Plus size={16} />
           {creating ? 'กำลังสร้าง...' : 'สร้าง Token'}
         </button>
@@ -1386,10 +1423,10 @@ function PdaTokenTab() {
               className={`rounded-xl border bg-white p-4 shadow-sm transition ${
                 !t.is_valid ? 'opacity-60' : ''
               } ${t.is_revoked ? 'border-red-200 bg-red-50/30' : t.is_expired ? 'border-gray-200 bg-gray-50/50' : 'border-green-200'}`}>
-              <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="flex flex-col sm:flex-row sm:flex-wrap items-start justify-between gap-3">
                 {/* Left */}
                 <div className="min-w-0 flex-1">
-                  <div className="mb-1 flex items-center gap-2">
+                  <div className="mb-1 flex flex-wrap items-center gap-2">
                     <span className="font-semibold text-gray-800">{t.name}</span>
                     {t.is_valid && (
                       <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-700">ใช้งานได้</span>
@@ -1401,7 +1438,7 @@ function PdaTokenTab() {
                       <span className="rounded-full bg-gray-200 px-2 py-0.5 text-[10px] font-semibold text-gray-600">หมดอายุ</span>
                     )}
                   </div>
-                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
+                  <div className="flex flex-wrap gap-x-3 sm:gap-x-4 gap-y-1 text-[10px] sm:text-xs text-gray-500">
                     <span>สร้างโดย: {t.created_by}</span>
                     <span>สร้างเมื่อ: {formatDate(t.created_at)}</span>
                     <span>หมดอายุ: {formatDate(t.expires_at)}</span>
@@ -1412,20 +1449,20 @@ function PdaTokenTab() {
                 </div>
 
                 {/* Right actions */}
-                <div className="flex shrink-0 items-center gap-2">
+                <div className="flex shrink-0 items-center gap-2 w-full sm:w-auto">
                   {t.is_valid && (
                     <>
                       <button onClick={() => copyUrl(t)}
-                        className="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50">
+                        className="flex flex-1 sm:flex-none items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50">
                         {copiedId === t.id ? <Check size={14} className="text-green-600" /> : <Copy size={14} />}
                         {copiedId === t.id ? 'คัดลอกแล้ว!' : 'Copy URL'}
                       </button>
                       <a href={getPdaUrl(t.token)} target="_blank" rel="noopener noreferrer"
-                        className="flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50">
+                        className="flex flex-1 sm:flex-none items-center justify-center gap-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50">
                         <ExternalLink size={14} /> เปิด
                       </a>
                       <button onClick={() => handleRevoke(t.id)}
-                        className="flex items-center gap-1 rounded-lg border border-red-300 bg-white px-3 py-2 text-xs font-medium text-red-600 transition hover:bg-red-50">
+                        className="flex flex-1 sm:flex-none items-center justify-center gap-1 rounded-lg border border-red-300 bg-white px-3 py-2 text-xs font-medium text-red-600 transition hover:bg-red-50">
                         <Ban size={14} /> เพิกถอน
                       </button>
                     </>
