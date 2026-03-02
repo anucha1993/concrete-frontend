@@ -698,8 +698,25 @@ function PrintPreviewModal({ items, paperSize, customTemplateData, printing, onC
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       if (src.includes('qrcode') && (window as any).qrcode) return Promise.resolve();
       return new Promise((resolve, reject) => {
-        const existing = document.querySelector(`script[src="${src}"]`);
-        if (existing) { resolve(); return; }
+        const existing = document.querySelector(`script[src="${src}"]`) as HTMLScriptElement | null;
+        if (existing) {
+          // Script tag exists — wait for it to actually load
+          const checkGlobal = () => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            if ((src.includes('JsBarcode') && (window as any).JsBarcode) ||
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                (src.includes('qrcode') && (window as any).qrcode)) {
+              resolve();
+            } else {
+              existing.addEventListener('load', () => resolve(), { once: true });
+              existing.addEventListener('error', reject, { once: true });
+              // Fallback: poll in case events already fired
+              setTimeout(() => resolve(), 500);
+            }
+          };
+          checkGlobal();
+          return;
+        }
         const s = document.createElement('script');
         s.src = src;
         s.onload = () => resolve();
@@ -733,6 +750,7 @@ function PrintPreviewModal({ items, paperSize, customTemplateData, printing, onC
 
   /* ── Build input data and HTML for a single label from template ── */
   const buildLabelHtml = (inv: Inventory, firstPage: Array<Record<string, unknown>>) => {
+    console.log('[buildLabelHtml] firstPage fields:', firstPage.map(f => ({ name: f.name, type: f.type, position: f.position, width: f.width, height: f.height, rotate: f.rotate })));
     const now = new Date();
     const dateStr = now.toLocaleDateString('th-TH', { day: '2-digit', month: '2-digit', year: 'numeric' });
     const input: Record<string, string> = {
@@ -763,6 +781,8 @@ function PrintPreviewModal({ items, paperSize, customTemplateData, printing, onC
       const fh = Number(field.height) || 6;
       const x = pos?.x ?? 0;
       const y = pos?.y ?? 0;
+      const rotate = Number(field.rotate) || 0;
+      const opacity = field.opacity !== undefined ? Number(field.opacity) : 1;
       const value = input[fname] || (field.content as string) || '';
       const fontSize = Number(field.fontSize) || 9;
       const alignment = (field.alignment as string) || 'left';
@@ -771,30 +791,32 @@ function PrintPreviewModal({ items, paperSize, customTemplateData, printing, onC
       const lineHeight = Number(field.lineHeight) || 1.2;
       const bgColor = (field.backgroundColor as string) || '';
       const isBold = fontName.includes('Bold');
+      const rotateStyle = rotate ? `transform:rotate(${rotate}deg);` : '';
+      const opacityStyle = opacity < 1 ? `opacity:${opacity};` : '';
 
       if (ftype === 'code128' || ftype === 'code39') {
         const barcodeFormat = ftype === 'code39' ? 'CODE39' : 'CODE128';
-        return `<div style="position:absolute; left:${x}mm; top:${y}mm; width:${fw}mm; height:${fh}mm; overflow:hidden; display:flex; align-items:center; justify-content:center;">
+        return `<div style="position:absolute; left:${x}mm; top:${y}mm; width:${fw}mm; height:${fh}mm; overflow:hidden; display:flex; align-items:center; justify-content:center; ${rotateStyle} ${opacityStyle}">
           <svg class="barcode" data-value="${escapeHtml(value)}" data-format="${barcodeFormat}"></svg>
         </div>`;
       }
       if (ftype === 'qrcode') {
-        return `<div style="position:absolute; left:${x}mm; top:${y}mm; width:${fw}mm; height:${fh}mm; overflow:hidden;">
+        return `<div style="position:absolute; left:${x}mm; top:${y}mm; width:${fw}mm; height:${fh}mm; overflow:hidden; ${rotateStyle} ${opacityStyle}">
           <div class="qr" data-value="${escapeHtml(value)}" style="width:100%; height:100%;"></div>
         </div>`;
       }
       if (ftype === 'line') {
         const color = (field.color as string) || '#000';
-        return `<div style="position:absolute; left:${x}mm; top:${y}mm; width:${fw}mm; height:0; border-top:0.3mm solid ${color};"></div>`;
+        return `<div style="position:absolute; left:${x}mm; top:${y}mm; width:${fw}mm; height:0; border-top:0.3mm solid ${color}; ${rotateStyle} ${opacityStyle}"></div>`;
       }
       if (ftype === 'rectangle') {
         const borderColor = (field.borderColor as string) || '#000';
         const borderWidth = Number(field.borderWidth) || 0.3;
-        return `<div style="position:absolute; left:${x}mm; top:${y}mm; width:${fw}mm; height:${fh}mm; border:${borderWidth}mm solid ${borderColor}; ${bgColor ? `background:${bgColor};` : ''}"></div>`;
+        return `<div style="position:absolute; left:${x}mm; top:${y}mm; width:${fw}mm; height:${fh}mm; border:${borderWidth}mm solid ${borderColor}; ${bgColor ? `background:${bgColor};` : ''} ${rotateStyle} ${opacityStyle}"></div>`;
       }
       if (ftype === 'ellipse') {
         const borderColor = (field.borderColor as string) || '#000';
-        return `<div style="position:absolute; left:${x}mm; top:${y}mm; width:${fw}mm; height:${fh}mm; border-radius:50%; border:0.3mm solid ${borderColor}; ${bgColor ? `background:${bgColor};` : ''}"></div>`;
+        return `<div style="position:absolute; left:${x}mm; top:${y}mm; width:${fw}mm; height:${fh}mm; border-radius:50%; border:0.3mm solid ${borderColor}; ${bgColor ? `background:${bgColor};` : ''} ${rotateStyle} ${opacityStyle}"></div>`;
       }
       const vAlign = (field.verticalAlignment as string) || 'top';
       const justifyMap: Record<string, string> = { top: 'flex-start', middle: 'center', bottom: 'flex-end' };
@@ -808,6 +830,7 @@ function PrintPreviewModal({ items, paperSize, customTemplateData, printing, onC
         ${isBold ? 'font-weight:bold;' : ''}
         ${bgColor ? `background:${bgColor};` : ''}
         ${padStyle}
+        ${rotateStyle} ${opacityStyle}
         overflow:hidden; white-space:pre-wrap; word-break:break-word;
       "><span>${escapeHtml(value)}</span></div>`;
     }).join('');
@@ -834,10 +857,7 @@ function PrintPreviewModal({ items, paperSize, customTemplateData, printing, onC
       `<div class="label">${buildLabelHtml(inv, firstPage)}</div>`
     ).join('');
 
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) { toast('ไม่สามารถเปิดหน้าต่างปริ้นได้ กรุณาอนุญาต popup', 'error'); return; }
-
-    printWindow.document.write(`<!DOCTYPE html>
+    const htmlContent = `<!DOCTYPE html>
 <html>
 <head>
   <title>Labels - ${escapeHtml(poOrderNumber)}</title>
@@ -858,57 +878,76 @@ function PrintPreviewModal({ items, paperSize, customTemplateData, printing, onC
       .label { background: white; border: 1px solid #d1d5db; border-radius: 4px; }
     }
   </style>
-  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
-  <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"><\/script>
 </head>
 <body>
   ${labelsHtml}
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"><\/script>
   <script>
-    // Render barcodes — stretch to fill container exactly like pdfme
-    document.querySelectorAll('svg.barcode').forEach(svg => {
-      const value = svg.dataset.value || '';
-      const fmt = svg.dataset.format || 'CODE128';
-      try {
-        JsBarcode(svg, value, {
-          format: fmt,
-          width: 1,
-          height: 60,
-          displayValue: true,
-          fontSize: 14,
-          textMargin: 2,
-          margin: 0,
-        });
-        // Capture rendered pixel size, then stretch via viewBox to fill container
-        const rw = svg.getAttribute('width');
-        const rh = svg.getAttribute('height');
-        if (rw && rh) {
-          svg.setAttribute('viewBox', '0 0 ' + rw.replace('px','') + ' ' + rh.replace('px',''));
-          svg.setAttribute('preserveAspectRatio', 'none');
-        }
-        svg.removeAttribute('width');
-        svg.removeAttribute('height');
-        svg.style.width = '100%';
-        svg.style.height = '100%';
-      } catch(e) { console.error('Barcode error:', e); }
+    function waitForScripts(cb, attempts) {
+      attempts = attempts || 0;
+      if (typeof JsBarcode !== 'undefined' && typeof qrcode !== 'undefined') { cb(); return; }
+      if (attempts > 50) { console.error('Scripts failed to load'); cb(); return; }
+      setTimeout(function() { waitForScripts(cb, attempts + 1); }, 100);
+    }
+    waitForScripts(function() {
+      // Render barcodes — stretch to fill container exactly like pdfme
+      document.querySelectorAll('svg.barcode').forEach(function(svg) {
+        var value = svg.dataset.value || '';
+        var fmt = svg.dataset.format || 'CODE128';
+        try {
+          JsBarcode(svg, value, {
+            format: fmt,
+            width: 1,
+            height: 60,
+            displayValue: true,
+            fontSize: 14,
+            textMargin: 2,
+            margin: 0,
+          });
+          var rw = svg.getAttribute('width');
+          var rh = svg.getAttribute('height');
+          if (rw && rh) {
+            svg.setAttribute('viewBox', '0 0 ' + rw.replace('px','') + ' ' + rh.replace('px',''));
+            svg.setAttribute('preserveAspectRatio', 'none');
+          }
+          svg.removeAttribute('width');
+          svg.removeAttribute('height');
+          svg.style.width = '100%';
+          svg.style.height = '100%';
+        } catch(e) { console.error('Barcode error:', e); }
+      });
+      // Render QR codes
+      document.querySelectorAll('.qr').forEach(function(el) {
+        var value = el.dataset.value || '';
+        try {
+          var q = qrcode(0, 'M');
+          q.addData(value);
+          q.make();
+          el.innerHTML = q.createSvgTag({ scalable: true });
+          var svg = el.querySelector('svg');
+          if (svg) { svg.style.width = '100%'; svg.style.height = '100%'; }
+        } catch(e) { console.error('QR error:', e); }
+      });
+      // Auto print after rendering
+      setTimeout(function() { window.print(); }, 300);
     });
-    // Render QR codes
-    document.querySelectorAll('.qr').forEach(el => {
-      const value = el.dataset.value || '';
-      try {
-        const qr = qrcode(0, 'M');
-        qr.addData(value);
-        qr.make();
-        el.innerHTML = qr.createSvgTag({ scalable: true });
-        const svg = el.querySelector('svg');
-        if (svg) { svg.style.width = '100%'; svg.style.height = '100%'; }
-      } catch(e) { console.error('QR error:', e); }
-    });
-    // Auto print after scripts load
-    setTimeout(() => window.print(), 500);
   <\/script>
 </body>
-</html>`);
-    printWindow.document.close();
+</html>`;
+
+    // ใช้ Blob URL แทน about:blank เพื่อให้ browser จัดการ printer settings ได้ถูกต้อง
+    const blob = new Blob([htmlContent], { type: 'text/html; charset=utf-8' });
+    const blobUrl = URL.createObjectURL(blob);
+    const printWindow = window.open(blobUrl, '_blank');
+    if (!printWindow) {
+      URL.revokeObjectURL(blobUrl);
+      toast('ไม่สามารถเปิดหน้าต่างปริ้นได้ กรุณาอนุญาต popup', 'error');
+      return;
+    }
+    // Clean up blob URL after window loads
+    printWindow.addEventListener('afterprint', () => URL.revokeObjectURL(blobUrl));
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 60000); // fallback cleanup after 1 min
   };
 
   return (
