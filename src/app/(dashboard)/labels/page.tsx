@@ -1084,15 +1084,25 @@ function VerifyTab({ canManage, onVerified }: { canManage: boolean; onVerified: 
   const [verifying, setVerifying] = useState(false);
   const [recentVerified, setRecentVerified] = useState<Array<{ serial: string; product: string; time: string; ok: boolean; msg: string }>>([]);
 
-  const handleVerify = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!serial.trim()) return;
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  /* ── Queue-based fast scan ── */
+  const scanQueueRef = useRef<string[]>([]);
+  const processingQueueRef = useRef(false);
+
+  const splitSerials = (input: string): string[] => {
+    const pattern = /[A-Za-z0-9]+-\d{4}-\d{8}/g;
+    const matches = input.match(pattern);
+    return matches && matches.length > 0 ? matches : [input];
+  };
+
+  const verifyOne = async (s: string) => {
     setVerifying(true);
     try {
-      const res = await labelService.verify(serial.trim());
+      const res = await labelService.verify(s);
       const inv = res.data;
       setRecentVerified(prev => [{
-        serial: serial.trim(),
+        serial: s,
         product: `${inv.product?.product_code} - ${inv.product?.name}`,
         time: new Date().toLocaleTimeString('th-TH'),
         ok: true,
@@ -1104,7 +1114,7 @@ function VerifyTab({ canManage, onVerified }: { canManage: boolean; onVerified: 
       const ax = err as AxiosError<{ message: string }>;
       const msg = ax.response?.data?.message || 'เกิดข้อผิดพลาด';
       setRecentVerified(prev => [{
-        serial: serial.trim(),
+        serial: s,
         product: '-',
         time: new Date().toLocaleTimeString('th-TH'),
         ok: false,
@@ -1112,28 +1122,60 @@ function VerifyTab({ canManage, onVerified }: { canManage: boolean; onVerified: 
       }, ...prev].slice(0, 50));
       toast(msg, 'error');
     } finally {
-      setSerial('');
       setVerifying(false);
-      document.getElementById('verify-input')?.focus();
+      setTimeout(() => { inputRef.current?.focus(); }, 50);
+    }
+  };
+
+  const processQueue = async () => {
+    if (processingQueueRef.current) return;
+    processingQueueRef.current = true;
+    while (scanQueueRef.current.length > 0) {
+      const next = scanQueueRef.current.shift()!;
+      await verifyOne(next);
+    }
+    processingQueueRef.current = false;
+  };
+
+  const handleVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const s = serial.trim();
+    if (!s) return;
+    setSerial('');
+
+    const parts = splitSerials(s);
+    scanQueueRef.current.push(...parts);
+    processQueue();
+  };
+
+  const handleSerialChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    const parts = splitSerials(val);
+    if (parts.length > 1) {
+      setSerial('');
+      scanQueueRef.current.push(...parts);
+      processQueue();
+    } else {
+      setSerial(val);
     }
   };
 
   return (
     <div className="space-y-6">
-      <div className="mx-auto max-w-lg rounded-xl border bg-white p-4 sm:p-6 shadow-sm">
+      <div className="mx-auto max-w-lg rounded-xl border bg-white p-6 shadow-sm">
         <div className="mb-4 text-center">
           <ScanBarcode size={48} className="mx-auto mb-2 text-blue-500" />
           <h3 className="text-lg font-semibold">ยิง PDA เพื่อยืนยันติด Label</h3>
           <p className="text-sm text-gray-500">สแกน barcode บนสินค้าเพื่อยืนยันว่าติด label แล้ว</p>
         </div>
 
-        <form onSubmit={handleVerify} className="flex flex-col sm:flex-row gap-2">
+        <form onSubmit={handleVerify} className="flex gap-2">
           <input
-            id="verify-input"
+            ref={inputRef}
             type="text"
             placeholder="สแกน Serial Number..."
             value={serial}
-            onChange={e => setSerial(e.target.value)}
+            onChange={handleSerialChange}
             autoFocus
             disabled={!canManage}
             className="flex-1 rounded-lg border border-gray-300 px-4 py-3 text-center font-mono text-lg focus:border-blue-500 focus:outline-none"
@@ -1149,26 +1191,7 @@ function VerifyTab({ canManage, onVerified }: { canManage: boolean; onVerified: 
       {recentVerified.length > 0 && (
         <div>
           <h4 className="mb-2 text-sm font-semibold text-gray-700">รายการสแกนล่าสุด</h4>
-
-          {/* Mobile card view */}
-          <div className="sm:hidden space-y-2 max-h-80 overflow-y-auto">
-            {recentVerified.map((r, i) => (
-              <div key={i} className={`rounded-lg border p-3 ${r.ok ? 'bg-white' : 'bg-red-50 border-red-200'}`}>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-mono text-xs font-medium">{r.serial}</span>
-                  <Badge variant={r.ok ? 'success' : 'danger'}>{r.ok ? 'สำเร็จ' : 'ล้มเหลว'}</Badge>
-                </div>
-                <div className="text-xs text-gray-500">{r.product}</div>
-                <div className="flex items-center justify-between mt-1">
-                  <span className="text-[10px] text-gray-400">{r.time}</span>
-                  <span className="text-[10px] text-gray-400">{r.msg}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Desktop table view */}
-          <div className="hidden sm:block max-h-80 overflow-y-auto rounded-lg border">
+          <div className="max-h-80 overflow-y-auto rounded-lg border">
             <table className="w-full text-sm">
               <thead className="sticky top-0 bg-gray-50">
                 <tr>
@@ -1269,25 +1292,21 @@ function HistoryTab() {
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-end gap-3">
-        <div className="relative flex-1 sm:flex-none">
+        <div className="relative">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input type="text" placeholder="ค้นหา serial..." value={search}
             onChange={e => { setSearch(e.target.value); setPage(1); }}
-            className="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm focus:border-blue-500 focus:outline-none" />
+            className="rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm focus:border-blue-500 focus:outline-none" />
         </div>
         <select value={printType} onChange={e => { setPrintType(e.target.value); setPage(1); }}
-          className="w-full sm:w-auto rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none">
+          className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none">
           <option value="">ทุกประเภท</option>
           <option value="FIRST">ปริ้นครั้งแรก</option>
           <option value="REPRINT">ปริ้นซ้ำ</option>
         </select>
       </div>
 
-      <div className="overflow-x-auto -mx-4 sm:mx-0">
-        <div className="min-w-[700px] px-4 sm:px-0">
-          <DataTable columns={columns} data={logs} loading={loading} emptyMessage="ไม่มีประวัติการปริ้น" />
-        </div>
-      </div>
+      <DataTable columns={columns} data={logs} loading={loading} emptyMessage="ไม่มีประวัติการปริ้น" />
       <Pagination currentPage={meta.current_page} lastPage={meta.last_page} total={meta.total} onPageChange={setPage} />
     </div>
   );
@@ -1395,7 +1414,7 @@ function PdaTokenTab() {
       </div>
 
       {/* Create token */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-3 rounded-xl border bg-white p-4 shadow-sm">
+      <div className="flex items-end gap-3 rounded-xl border bg-white p-4 shadow-sm">
         <div className="flex-1">
           <label className="mb-1 block text-sm font-medium text-gray-700">ชื่อ / หมายเหตุ (ไม่จำเป็น)</label>
           <input type="text" value={name} onChange={e => setName(e.target.value)}
@@ -1403,7 +1422,7 @@ function PdaTokenTab() {
             className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none" />
         </div>
         <button onClick={handleCreate} disabled={creating}
-          className="flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50">
+          className="flex shrink-0 items-center gap-1.5 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50">
           <Plus size={16} />
           {creating ? 'กำลังสร้าง...' : 'สร้าง Token'}
         </button>
@@ -1423,10 +1442,10 @@ function PdaTokenTab() {
               className={`rounded-xl border bg-white p-4 shadow-sm transition ${
                 !t.is_valid ? 'opacity-60' : ''
               } ${t.is_revoked ? 'border-red-200 bg-red-50/30' : t.is_expired ? 'border-gray-200 bg-gray-50/50' : 'border-green-200'}`}>
-              <div className="flex flex-col sm:flex-row sm:flex-wrap items-start justify-between gap-3">
+              <div className="flex flex-wrap items-start justify-between gap-3">
                 {/* Left */}
                 <div className="min-w-0 flex-1">
-                  <div className="mb-1 flex flex-wrap items-center gap-2">
+                  <div className="mb-1 flex items-center gap-2">
                     <span className="font-semibold text-gray-800">{t.name}</span>
                     {t.is_valid && (
                       <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-700">ใช้งานได้</span>
@@ -1438,7 +1457,7 @@ function PdaTokenTab() {
                       <span className="rounded-full bg-gray-200 px-2 py-0.5 text-[10px] font-semibold text-gray-600">หมดอายุ</span>
                     )}
                   </div>
-                  <div className="flex flex-wrap gap-x-3 sm:gap-x-4 gap-y-1 text-[10px] sm:text-xs text-gray-500">
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
                     <span>สร้างโดย: {t.created_by}</span>
                     <span>สร้างเมื่อ: {formatDate(t.created_at)}</span>
                     <span>หมดอายุ: {formatDate(t.expires_at)}</span>
@@ -1449,20 +1468,20 @@ function PdaTokenTab() {
                 </div>
 
                 {/* Right actions */}
-                <div className="flex shrink-0 items-center gap-2 w-full sm:w-auto">
+                <div className="flex shrink-0 items-center gap-2">
                   {t.is_valid && (
                     <>
                       <button onClick={() => copyUrl(t)}
-                        className="flex flex-1 sm:flex-none items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50">
+                        className="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50">
                         {copiedId === t.id ? <Check size={14} className="text-green-600" /> : <Copy size={14} />}
                         {copiedId === t.id ? 'คัดลอกแล้ว!' : 'Copy URL'}
                       </button>
                       <a href={getPdaUrl(t.token)} target="_blank" rel="noopener noreferrer"
-                        className="flex flex-1 sm:flex-none items-center justify-center gap-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50">
+                        className="flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50">
                         <ExternalLink size={14} /> เปิด
                       </a>
                       <button onClick={() => handleRevoke(t.id)}
-                        className="flex flex-1 sm:flex-none items-center justify-center gap-1 rounded-lg border border-red-300 bg-white px-3 py-2 text-xs font-medium text-red-600 transition hover:bg-red-50">
+                        className="flex items-center gap-1 rounded-lg border border-red-300 bg-white px-3 py-2 text-xs font-medium text-red-600 transition hover:bg-red-50">
                         <Ban size={14} /> เพิกถอน
                       </button>
                     </>

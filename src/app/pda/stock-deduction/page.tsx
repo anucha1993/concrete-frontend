@@ -120,6 +120,19 @@ function PdaStockDeductionPage() {
 
   const inputRef = useRef<HTMLInputElement>(null);
   const idRef = useRef(0);
+  const scanQueueRef = useRef<string[]>([]);
+  const processingQueueRef = useRef(false);
+
+  /**
+   * แยก serial ที่ติดกันออกเป็น array
+   * รองรับ pattern: {ตัวอักษร/ตัวเลข}-{4หลัก}-{8หลัก}
+   * เช่น "B001-2603-00000008B001-2603-00000009" → ["B001-2603-00000008", "B001-2603-00000009"]
+   */
+  const splitSerials = (input: string): string[] => {
+    const pattern = /[A-Za-z0-9]+-\d{4}-\d{8}/g;
+    const matches = input.match(pattern);
+    return matches && matches.length > 0 ? matches : [input];
+  };
 
   /* ═══ Token validation ═══ */
   const validateToken = useCallback(async (t: string) => {
@@ -243,14 +256,11 @@ function PdaStockDeductionPage() {
     }
   }, [selectedDeduction]);
 
-  /* ═══ Scan ═══ */
-  const handleScan = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const s = serial.trim();
-    if (!s || !token || !selectedDeduction || scanning) return;
+  /* ═══ Scan single serial (core) ═══ */
+  const scanOne = async (s: string): Promise<void> => {
+    if (!s || !token || !selectedDeduction) return;
 
     setScanning(true);
-    setSerial('');
     const scanId = ++idRef.current;
 
     try {
@@ -290,6 +300,8 @@ function PdaStockDeductionPage() {
 
       // If all fulfilled — show completion
       if (res.data?.all_fulfilled) {
+        // Clear remaining queue — all done
+        scanQueueRef.current = [];
         setTimeout(() => {
           setLastResult({
             id: ++idRef.current,
@@ -314,7 +326,58 @@ function PdaStockDeductionPage() {
       setResults(prev => [errResult, ...prev]);
     } finally {
       setScanning(false);
+    }
+  };
+
+  /* ═══ Process scan queue ═══ */
+  const processQueue = useCallback(async () => {
+    if (processingQueueRef.current) return;
+    processingQueueRef.current = true;
+
+    while (scanQueueRef.current.length > 0) {
+      const next = scanQueueRef.current.shift()!;
+      await scanOne(next);
+    }
+
+    processingQueueRef.current = false;
+    setTimeout(() => {
       inputRef.current?.focus();
+    }, 50);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, selectedDeduction]);
+
+  /* ═══ Handle form submit (Enter key) ═══ */
+  const handleScan = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const raw = serial.trim();
+    if (!raw || !token || !selectedDeduction) return;
+
+    setSerial('');
+
+    // แยก serial ที่อาจติดกัน
+    const serials = splitSerials(raw);
+
+    // เพิ่มเข้า queue
+    scanQueueRef.current.push(...serials);
+
+    // เริ่ม process
+    processQueue();
+  };
+
+  /* ═══ Handle input change — auto-detect & split multiple serials ═══ */
+  const handleSerialChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+
+    // ตรวจจับว่ามี serial หลายตัวติดกัน (ยิง barcode เร็วๆ)
+    const serials = splitSerials(val);
+
+    if (serials.length > 1) {
+      // พบ serial หลายตัว — ส่งเข้า queue ทันที
+      setSerial('');
+      scanQueueRef.current.push(...serials);
+      processQueue();
+    } else {
+      setSerial(val);
     }
   };
 
@@ -494,7 +557,7 @@ function PdaStockDeductionPage() {
                 ref={inputRef}
                 type="text"
                 value={serial}
-                onChange={e => setSerial(e.target.value)}
+                onChange={handleSerialChange}
                 placeholder="สแกน barcode ตัดสต๊อก..."
                 disabled={scanning}
                 className="w-full rounded-xl border-2 border-orange-300 bg-white px-4 py-3 text-center font-mono focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-200 disabled:opacity-50"

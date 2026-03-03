@@ -119,6 +119,16 @@ function PdaClaimContent() {
   const [scanMessage, setScanMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
   const serialRef = useRef<HTMLInputElement>(null);
 
+  /* ── Queue-based fast scan ── */
+  const scanQueueRef = useRef<string[]>([]);
+  const processingQueueRef = useRef(false);
+
+  const splitSerials = (input: string): string[] => {
+    const pattern = /[A-Za-z0-9]+-\d{4}-\d{8}/g;
+    const matches = input.match(pattern);
+    return matches && matches.length > 0 ? matches : [input];
+  };
+
   /* ── Token validation ── */
   const validateToken = useCallback(async (t: string) => {
     try {
@@ -194,11 +204,9 @@ function PdaClaimContent() {
     }
   }, [screen, loadProgress]);
 
-  /* ── Scan ── */
-  const handleScan = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const serial = serialInput.trim();
-    if (!serial || !selectedClaim || !token) return;
+  /* ── Scan one serial ── */
+  const scanOne = async (s: string) => {
+    if (!s || !selectedClaim || !token) return;
 
     setScanning(true);
     setScanMessage(null);
@@ -206,11 +214,11 @@ function PdaClaimContent() {
     try {
       const res = await pdaApi<ScanResponse>('POST', '/pda/claims/scan', token, {
         claim_id: selectedClaim.id,
-        serial_number: serial,
+        serial_number: s,
       });
 
       if (res.success) {
-        setScanMessage({ text: `${res.data?.product_name || serial} — สแกนสำเร็จ`, type: 'success' });
+        setScanMessage({ text: `${res.data?.product_name || s} — สแกนสำเร็จ`, type: 'success' });
         loadProgress();
       } else {
         setScanMessage({ text: res.message, type: 'error' });
@@ -223,9 +231,44 @@ function PdaClaimContent() {
         setScanMessage({ text: e.message || 'สแกนไม่สำเร็จ', type: 'error' });
       }
     } finally {
-      setSerialInput('');
       setScanning(false);
-      serialRef.current?.focus();
+      setTimeout(() => { serialRef.current?.focus(); }, 50);
+    }
+  };
+
+  /* ── Process queue ── */
+  const processQueue = async () => {
+    if (processingQueueRef.current) return;
+    processingQueueRef.current = true;
+    while (scanQueueRef.current.length > 0) {
+      const next = scanQueueRef.current.shift()!;
+      await scanOne(next);
+    }
+    processingQueueRef.current = false;
+  };
+
+  /* ── Scan (form submit) ── */
+  const handleScan = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const serial = serialInput.trim();
+    if (!serial || !selectedClaim || !token) return;
+    setSerialInput('');
+
+    const parts = splitSerials(serial);
+    scanQueueRef.current.push(...parts);
+    processQueue();
+  };
+
+  /* ── Auto-detect fast scan in onChange ── */
+  const handleSerialChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    const parts = splitSerials(val);
+    if (parts.length > 1) {
+      setSerialInput('');
+      scanQueueRef.current.push(...parts);
+      processQueue();
+    } else {
+      setSerialInput(val);
     }
   };
 
@@ -386,7 +429,7 @@ function PdaClaimContent() {
               ref={serialRef}
               type="text"
               value={serialInput}
-              onChange={e => setSerialInput(e.target.value)}
+              onChange={handleSerialChange}
               placeholder="ยิง Barcode / Serial..."
               className="flex-1 rounded-lg border border-gray-300 px-3 py-2.5 text-sm font-mono focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-200"
               autoFocus

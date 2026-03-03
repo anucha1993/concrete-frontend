@@ -480,6 +480,18 @@ function DetailView({ id, canManage, onBack }: { id: number; canManage: boolean;
   const [scanning, setScanning] = useState(false);
   const [lastScanResult, setLastScanResult] = useState<{ success: boolean; message: string; product_name?: string } | null>(null);
   const scanInputRef = useRef<HTMLInputElement>(null);
+  const scanQueueRef = useRef<string[]>([]);
+  const processingQueueRef = useRef(false);
+
+  /**
+   * แยก serial ที่ติดกัน เช่น "B001-2603-00000008B001-2603-00000009"
+   * → ["B001-2603-00000008", "B001-2603-00000009"]
+   */
+  const splitSerials = (input: string): string[] => {
+    const pattern = /[A-Za-z0-9]+-\d{4}-\d{8}/g;
+    const matches = input.match(pattern);
+    return matches && matches.length > 0 ? matches : [input];
+  };
 
   // Edit state
   const [editing, setEditing] = useState(false);
@@ -559,25 +571,64 @@ function DetailView({ id, canManage, onBack }: { id: number; canManage: boolean;
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Admin scan handler
-  const handleAdminScan = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const s = serialInput.trim();
-    if (!s || !deduction || scanning) return;
+  // Admin scan — single serial (core)
+  const scanOneAdmin = async (s: string) => {
+    if (!s || !deduction) return;
     setScanning(true);
     setLastScanResult(null);
     try {
       const res = await stockDeductionService.scan(deduction.id, s);
       setLastScanResult({ success: true, message: res.message || 'สแกนสำเร็จ', product_name: res.data?.product_name });
       setTimeout(() => setLastScanResult(prev => prev?.success ? null : prev), 2000);
-      setSerialInput('');
       fetchData(true);
     } catch (err: unknown) {
       const ax = err as AxiosError<{ message: string }>;
       setLastScanResult({ success: false, message: ax.response?.data?.message || 'เกิดข้อผิดพลาด' });
     } finally {
       setScanning(false);
+    }
+  };
+
+  // Process scan queue
+  const processAdminQueue = useCallback(async () => {
+    if (processingQueueRef.current) return;
+    processingQueueRef.current = true;
+
+    while (scanQueueRef.current.length > 0) {
+      const next = scanQueueRef.current.shift()!;
+      await scanOneAdmin(next);
+    }
+
+    processingQueueRef.current = false;
+    setTimeout(() => {
       scanInputRef.current?.focus();
+    }, 50);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deduction]);
+
+  // Admin scan handler (form submit)
+  const handleAdminScan = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const raw = serialInput.trim();
+    if (!raw || !deduction) return;
+    setSerialInput('');
+
+    const serials = splitSerials(raw);
+    scanQueueRef.current.push(...serials);
+    processAdminQueue();
+  };
+
+  // Handle input change — auto-detect multiple serials
+  const handleSerialInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    const serials = splitSerials(val);
+
+    if (serials.length > 1) {
+      setSerialInput('');
+      scanQueueRef.current.push(...serials);
+      processAdminQueue();
+    } else {
+      setSerialInput(val);
     }
   };
 
@@ -778,9 +829,10 @@ function DetailView({ id, canManage, onBack }: { id: number; canManage: boolean;
               ref={scanInputRef}
               type="text"
               value={serialInput}
-              onChange={e => setSerialInput(e.target.value)}
+              onChange={handleSerialInputChange}
               placeholder="สแกนหรือพิมพ์ Serial Number..."
               disabled={scanning}
+              autoFocus
               className="flex-1 rounded-lg border border-green-300 bg-white px-3 py-2 font-mono text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-200 disabled:opacity-50"
               autoComplete="off"
             />

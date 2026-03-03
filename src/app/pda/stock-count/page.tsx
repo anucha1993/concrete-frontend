@@ -119,6 +119,16 @@ function PdaStockCountPage() {
   const inputRef = useRef<HTMLInputElement>(null);
   const idRef = useRef(0);
 
+  /* ── Queue-based fast scan ── */
+  const scanQueueRef = useRef<string[]>([]);
+  const processingQueueRef = useRef(false);
+
+  const splitSerials = (input: string): string[] => {
+    const pattern = /[A-Za-z0-9]+-\d{4}-\d{8}/g;
+    const matches = input.match(pattern);
+    return matches && matches.length > 0 ? matches : [input];
+  };
+
   /* ═══ Token validation ═══ */
   const validateToken = useCallback(async (t: string) => {
     if (!t) return;
@@ -245,14 +255,11 @@ function PdaStockCountPage() {
     }
   }, [selectedCount]);
 
-  /* ═══ Scan ═══ */
-  const handleScan = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const s = serial.trim();
-    if (!s || !token || !selectedCount || scanning) return;
+  /* ═══ Scan one serial ═══ */
+  const scanOne = async (s: string) => {
+    if (!s || !token || !selectedCount) return;
 
     setScanning(true);
-    setSerial('');
 
     try {
       const res = await pdaApi('POST', '/pda/stock-counts/scan', token, {
@@ -321,7 +328,43 @@ function PdaStockCountPage() {
       setResults(prev => [result, ...prev].slice(0, 200));
     } finally {
       setScanning(false);
-      inputRef.current?.focus();
+      setTimeout(() => { inputRef.current?.focus(); }, 50);
+    }
+  };
+
+  /* ═══ Process queue ═══ */
+  const processQueue = async () => {
+    if (processingQueueRef.current) return;
+    processingQueueRef.current = true;
+    while (scanQueueRef.current.length > 0) {
+      const next = scanQueueRef.current.shift()!;
+      await scanOne(next);
+    }
+    processingQueueRef.current = false;
+  };
+
+  /* ═══ Scan (form submit) ═══ */
+  const handleScan = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const s = serial.trim();
+    if (!s || !token || !selectedCount || scanning) return;
+    setSerial('');
+
+    const parts = splitSerials(s);
+    scanQueueRef.current.push(...parts);
+    processQueue();
+  };
+
+  /* ═══ Auto-detect fast scan in onChange ═══ */
+  const handleSerialChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    const parts = splitSerials(val);
+    if (parts.length > 1) {
+      setSerial('');
+      scanQueueRef.current.push(...parts);
+      processQueue();
+    } else {
+      setSerial(val);
     }
   };
 
@@ -538,7 +581,7 @@ function PdaStockCountPage() {
         <form onSubmit={handleScan} className="mb-2">
           <div className="flex gap-1.5">
             <input ref={inputRef} type="text" value={serial}
-              onChange={e => setSerial(e.target.value)}
+              onChange={handleSerialChange}
               placeholder="สแกน Barcode..."
               autoFocus autoComplete="off"
               className="flex-1 rounded-lg border-2 border-indigo-300 px-2.5 py-2 text-sm font-medium focus:border-indigo-500 focus:outline-none" />
