@@ -271,6 +271,61 @@ function PdaStockDeductionPage() {
     };
   }, []);
 
+  /* ═══ Start camera when cameraOpen becomes true ═══ */
+  useEffect(() => {
+    if (!cameraOpen) return;
+    let cancelled = false;
+
+    const init = async () => {
+      // ให้ DOM render div ก่อน 1 frame
+      await new Promise(r => requestAnimationFrame(r));
+      if (cancelled) return;
+
+      try {
+        const { Html5Qrcode } = await import('html5-qrcode');
+        if (cancelled) return;
+
+        const scanner = new Html5Qrcode('pda-camera-scanner');
+        html5QrCodeRef.current = scanner;
+
+        await scanner.start(
+          { facingMode: 'environment' },
+          { fps: 10, qrbox: { width: 280, height: 120 }, aspectRatio: 1.5 },
+          (decodedText) => {
+            if (cameraScanLockRef.current) return;
+            cameraScanLockRef.current = true;
+            if (navigator.vibrate) navigator.vibrate(100);
+
+            const serials = splitSerials(decodedText.trim());
+            scanQueueRef.current.push(...serials);
+            processQueue();
+
+            setTimeout(() => { cameraScanLockRef.current = false; }, 1500);
+          },
+          () => { /* ignore scan failures */ }
+        );
+      } catch (err) {
+        console.error('Camera error:', err);
+        if (!cancelled) {
+          setCameraOpen(false);
+          alert('ไม่สามารถเปิดกล้องได้ กรุณาอนุญาตสิทธิ์กล้อง');
+        }
+      }
+    };
+
+    init();
+
+    return () => {
+      cancelled = true;
+      if (html5QrCodeRef.current) {
+        html5QrCodeRef.current.stop().catch(() => {});
+        try { html5QrCodeRef.current.clear(); } catch { /* ignore */ }
+        html5QrCodeRef.current = null;
+      }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cameraOpen]);
+
   /* ═══ Scan single serial (core) ═══ */
   const scanOne = async (s: string): Promise<void> => {
     if (!s || !token || !selectedDeduction) return;
@@ -409,47 +464,11 @@ function PdaStockDeductionPage() {
   };
 
   /* ═══ Camera scanner ═══ */
-  const startCamera = async () => {
-    if (!scannerRef.current) return;
-    try {
-      const { Html5Qrcode } = await import('html5-qrcode');
-      const scanner = new Html5Qrcode('pda-camera-scanner');
-      html5QrCodeRef.current = scanner;
-      await scanner.start(
-        { facingMode: 'environment' },
-        { fps: 10, qrbox: { width: 280, height: 120 }, aspectRatio: 1.5 },
-        (decodedText) => {
-          // Prevent duplicate rapid scans
-          if (cameraScanLockRef.current) return;
-          cameraScanLockRef.current = true;
-
-          // Vibrate on successful camera scan
-          if (navigator.vibrate) navigator.vibrate(100);
-
-          const serials = splitSerials(decodedText.trim());
-          scanQueueRef.current.push(...serials);
-          processQueue();
-
-          // Unlock after 1.5s to prevent re-scanning same code
-          setTimeout(() => { cameraScanLockRef.current = false; }, 1500);
-        },
-        () => { /* ignore scan failures */ }
-      );
-      setCameraOpen(true);
-    } catch (err) {
-      console.error('Camera error:', err);
-      alert('ไม่สามารถเปิดกล้องได้ กรุณาอนุญาตสิทธิ์กล้อง');
-    }
+  const startCamera = () => {
+    setCameraOpen(true);
   };
 
-  const stopCamera = async () => {
-    try {
-      if (html5QrCodeRef.current) {
-        await html5QrCodeRef.current.stop();
-        html5QrCodeRef.current.clear();
-        html5QrCodeRef.current = null;
-      }
-    } catch { /* ignore */ }
+  const stopCamera = () => {
     setCameraOpen(false);
   };
 
