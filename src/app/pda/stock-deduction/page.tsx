@@ -120,6 +120,7 @@ function PdaStockDeductionPage() {
 
   /* ── Camera scanner ── */
   const [cameraOpen, setCameraOpen] = useState(false);
+  const [cameraScanFlash, setCameraScanFlash] = useState<string | null>(null);
   const scannerRef = useRef<HTMLDivElement>(null);
   const html5QrCodeRef = useRef<import('html5-qrcode').Html5Qrcode | null>(null);
   const cameraScanLockRef = useRef(false);
@@ -290,11 +291,15 @@ function PdaStockDeductionPage() {
 
         await scanner.start(
           { facingMode: 'environment' },
-          { fps: 10, qrbox: { width: 280, height: 120 }, aspectRatio: 1.5 },
+          { fps: 10, qrbox: { width: 200, height: 200 } },
           (decodedText) => {
             if (cameraScanLockRef.current) return;
             cameraScanLockRef.current = true;
             if (navigator.vibrate) navigator.vibrate(100);
+
+            // Flash scanned text on camera
+            setCameraScanFlash(decodedText.trim());
+            setTimeout(() => setCameraScanFlash(null), 2000);
 
             const serials = splitSerials(decodedText.trim());
             scanQueueRef.current.push(...serials);
@@ -665,8 +670,18 @@ function PdaStockDeductionPage() {
             </form>
 
             {/* Camera view */}
-            <div className={`overflow-hidden rounded-xl border-2 border-orange-300 bg-black ${cameraOpen ? '' : 'hidden'}`}>
-              <div id="pda-camera-scanner" ref={scannerRef} className="w-full" />
+            <div className={`relative mx-auto overflow-hidden rounded-xl border-2 border-orange-300 bg-black ${cameraOpen ? '' : 'hidden'}`}
+              style={{ maxWidth: '100%', height: '240px' }}>
+              <div id="pda-camera-scanner" ref={scannerRef} style={{ height: '240px', overflow: 'hidden' }} />
+              {/* Scan flash overlay */}
+              {cameraScanFlash && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center bg-green-500/70 animate-pulse">
+                  <div className="text-center">
+                    <CheckCircle size={28} className="mx-auto mb-1 text-white" />
+                    <div className="font-mono text-sm font-bold text-white px-2 break-all">{cameraScanFlash}</div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
