@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
+import QRCode from 'qrcode';
 
 /* ─────────── Constants ─────────── */
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
@@ -28,6 +29,7 @@ interface Creator { id: number; name: string; }
 interface Deduction {
   id: number; code: string; type: string; status: string;
   customer_name?: string; reference_doc?: string; reason?: string; note?: string;
+  pda_token?: string | null;
   created_at: string; approved_at?: string;
   creator?: Creator; approver?: Creator;
   lines?: Line[]; scans?: Scan[];
@@ -38,11 +40,16 @@ export default function StockDeductionPrintPage() {
   const id = Number(params.id);
   const [data, setData] = useState<Deduction | null>(null);
   const [loading, setLoading] = useState(true);
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  const [pdaLink, setPdaLink] = useState<string | null>(null);
+  const [tokenExpiresAt, setTokenExpiresAt] = useState<string | null>(null);
   const hasPrinted = useRef(false);
+
+  const getAuthToken = () => getCookie(TOKEN_KEY);
 
   const fetchData = useCallback(async () => {
     try {
-      const token = getCookie(TOKEN_KEY);
+      const token = getAuthToken();
       const res = await fetch(`${API}/stock-deductions/${id}`, {
         headers: { 'Accept': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
       });
@@ -52,13 +59,66 @@ export default function StockDeductionPrintPage() {
     finally { setLoading(false); }
   }, [id]);
 
+  /* ── Generate/refresh PDA token on print ── */
+  const generatePrintToken = useCallback(async (deduction: Deduction) => {
+    // ถ้าสถานะเสร็จแล้ว/ยกเลิก → ไม่ต้องสร้าง QR
+    if (['APPROVED', 'CANCELLED'].includes(deduction.status)) return;
+
+    try {
+      const token = getAuthToken();
+      const res = await fetch(`${API}/stock-deductions/${id}/generate-print-token`, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+      });
+      const json = await res.json();
+
+      if (json.success && json.pda_token) {
+        const base = typeof window !== 'undefined' ? window.location.origin : '';
+        const link = `${base}/pda/stock-deduction?token=${json.pda_token}&id=${id}`;
+        setPdaLink(link);
+
+        // Format expiry date/time
+        if (json.expires_at) {
+          const exp = new Date(json.expires_at);
+          setTokenExpiresAt(exp.toLocaleString('th-TH', {
+            year: 'numeric', month: 'long', day: 'numeric',
+            hour: '2-digit', minute: '2-digit', second: '2-digit',
+          }));
+        }
+
+        // Generate QR code as data URL
+        const dataUrl = await QRCode.toDataURL(link, {
+          width: 200,
+          margin: 1,
+          color: { dark: '#000000', light: '#ffffff' },
+          errorCorrectionLevel: 'M',
+        });
+        setQrDataUrl(dataUrl);
+      }
+    } catch { /* ignore — QR just won't show */ }
+  }, [id]);
+
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Generate token after data loaded
   useEffect(() => {
-    if (data && !hasPrinted.current) {
-      hasPrinted.current = true;
-      setTimeout(() => window.print(), 800);
+    if (data) {
+      generatePrintToken(data);
     }
-  }, [data]);
+  }, [data, generatePrintToken]);
+
+  // Auto-print after data + QR ready (or status doesn't need QR)
+  useEffect(() => {
+    if (!data || hasPrinted.current) return;
+    const needsQr = !['APPROVED', 'CANCELLED'].includes(data.status);
+    if (needsQr && !qrDataUrl) return; // wait for QR
+    hasPrinted.current = true;
+    setTimeout(() => window.print(), 800);
+  }, [data, qrDataUrl]);
 
   if (loading) return <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', fontFamily: 'Sarabun, sans-serif', color: '#666' }}>กำลังโหลด...</div>;
   if (!data) return <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', fontFamily: 'Sarabun, sans-serif', color: '#c00' }}>ไม่พบข้อมูลเอกสาร</div>;
@@ -178,6 +238,15 @@ export default function StockDeductionPrintPage() {
         /* Watermark */
         .wm { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%) rotate(-30deg); font-size: 60pt; font-weight: 900; opacity: 0.08; pointer-events: none; letter-spacing: 8pt; color: #666; }
         .wm-cancel { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%) rotate(-25deg); font-size: 72pt; font-weight: 900; opacity: 0.15; pointer-events: none; letter-spacing: 12pt; color: #dc2626; border: 6pt solid rgba(220,38,38,0.15); padding: 10pt 40pt; border-radius: 12pt; }
+
+        /* QR Code */
+        .qr-section { display: flex; align-items: center; gap: 10pt; border: 1.5pt solid #2563eb; border-radius: 6pt; padding: 8pt 12pt; margin-bottom: 12pt; background: #eff6ff; }
+        .qr-section img { width: 80pt; height: 80pt; flex-shrink: 0; }
+        .qr-info { flex: 1; }
+        .qr-info .qr-title { font-size: 10pt; font-weight: 700; color: #1d4ed8; margin-bottom: 2pt; }
+        .qr-info .qr-desc { font-size: 7.5pt; color: #555; line-height: 1.5; }
+        .qr-info .qr-link { font-size: 6pt; color: #999; word-break: break-all; margin-top: 3pt; font-family: 'Courier New', monospace; }
+        .qr-info .qr-expire { font-size: 7pt; color: #dc2626; font-weight: 600; margin-top: 2pt; }
       `}</style>
 
       {/* Toolbar */}
@@ -221,6 +290,22 @@ export default function StockDeductionPrintPage() {
             {data.approved_at && <div className="info-item"><div className="k">วันที่อนุมัติ</div><div className="v">{fmtShortDate(data.approved_at)}</div></div>}
           </div>
         </div>
+
+        {/* QR Code — PDA Scan Link */}
+        {qrDataUrl && pdaLink && !['APPROVED', 'CANCELLED'].includes(data.status) && (
+          <div className="qr-section">
+            <img src={qrDataUrl} alt="QR Code สแกนตัดสต๊อก" />
+            <div className="qr-info">
+              <div className="qr-title">📱 สแกน QR Code เพื่อตัดสต๊อกสินค้า</div>
+              <div className="qr-desc">
+                ใช้ PDA หรือโทรศัพท์มือถือสแกน QR Code นี้<br />
+                เพื่อเข้าสู่หน้าสแกน Barcode ตัดสต๊อกสินค้า
+              </div>
+              <div className="qr-expire">⏱ หมดอายุ: {tokenExpiresAt || '24 ชั่วโมงนับจากเวลาปริ้น'}</div>
+              <div className="qr-link">{pdaLink}</div>
+            </div>
+          </div>
+        )}
 
         {/* Items table */}
         <table className="items">

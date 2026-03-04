@@ -80,4 +80,9 @@ export const stockDeductionService = {
     const res = await api.delete<ApiResponse<null>>(`/stock-deductions/${deductionId}/scans/${scanId}`);
     return res.data;
   },
+
+  generatePrintToken: async (id: number) => {
+    const res = await api.post<{ success: boolean; pda_token: string | null; message: string }>(`/stock-deductions/${id}/generate-print-token`);
+    return res.data;
+  },
 };
