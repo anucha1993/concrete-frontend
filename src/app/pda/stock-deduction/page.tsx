@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { API_BASE_URL } from '@/lib/constants';
 import {
   CheckCircle, XCircle, Clock, X,
-  ArrowLeft, Trash2, TrendingDown,
+  ArrowLeft, Trash2, TrendingDown, Camera, CameraOff,
 } from 'lucide-react';
 
 /* ── Types ── */
@@ -117,6 +117,12 @@ function PdaStockDeductionPage() {
   const [scanning, setScanning] = useState(false);
   const [results, setResults] = useState<ScanResult[]>([]);
   const [lastResult, setLastResult] = useState<ScanResult | null>(null);
+
+  /* ── Camera scanner ── */
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const scannerRef = useRef<HTMLDivElement>(null);
+  const html5QrCodeRef = useRef<import('html5-qrcode').Html5Qrcode | null>(null);
+  const cameraScanLockRef = useRef(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const idRef = useRef(0);
@@ -256,6 +262,15 @@ function PdaStockDeductionPage() {
     }
   }, [selectedDeduction]);
 
+  /* ═══ Cleanup camera on unmount ═══ */
+  useEffect(() => {
+    return () => {
+      if (html5QrCodeRef.current) {
+        html5QrCodeRef.current.stop().catch(() => {});
+      }
+    };
+  }, []);
+
   /* ═══ Scan single serial (core) ═══ */
   const scanOne = async (s: string): Promise<void> => {
     if (!s || !token || !selectedDeduction) return;
@@ -393,6 +408,51 @@ function PdaStockDeductionPage() {
     } catch { /* ignore */ }
   };
 
+  /* ═══ Camera scanner ═══ */
+  const startCamera = async () => {
+    if (!scannerRef.current) return;
+    try {
+      const { Html5Qrcode } = await import('html5-qrcode');
+      const scanner = new Html5Qrcode('pda-camera-scanner');
+      html5QrCodeRef.current = scanner;
+      await scanner.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: { width: 280, height: 120 }, aspectRatio: 1.5 },
+        (decodedText) => {
+          // Prevent duplicate rapid scans
+          if (cameraScanLockRef.current) return;
+          cameraScanLockRef.current = true;
+
+          // Vibrate on successful camera scan
+          if (navigator.vibrate) navigator.vibrate(100);
+
+          const serials = splitSerials(decodedText.trim());
+          scanQueueRef.current.push(...serials);
+          processQueue();
+
+          // Unlock after 1.5s to prevent re-scanning same code
+          setTimeout(() => { cameraScanLockRef.current = false; }, 1500);
+        },
+        () => { /* ignore scan failures */ }
+      );
+      setCameraOpen(true);
+    } catch (err) {
+      console.error('Camera error:', err);
+      alert('ไม่สามารถเปิดกล้องได้ กรุณาอนุญาตสิทธิ์กล้อง');
+    }
+  };
+
+  const stopCamera = async () => {
+    try {
+      if (html5QrCodeRef.current) {
+        await html5QrCodeRef.current.stop();
+        html5QrCodeRef.current.clear();
+        html5QrCodeRef.current = null;
+      }
+    } catch { /* ignore */ }
+    setCameraOpen(false);
+  };
+
   /* ═══════════════════════════════════════════════
      SCREEN 1: Token Entry
      ═══════════════════════════════════════════════ */
@@ -520,7 +580,7 @@ function PdaStockDeductionPage() {
       {/* Top bar */}
       <div className="sticky top-0 z-10 bg-white shadow-sm">
         <div className="flex items-center justify-between px-4 py-2">
-          <button onClick={() => { setSelectedDeduction(null); setResults([]); setLastResult(null); setProgress(null); }}
+          <button onClick={() => { stopCamera(); setSelectedDeduction(null); setResults([]); setLastResult(null); setProgress(null); }}
             className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-800">
             <ArrowLeft size={16} /> กลับ
           </button>
@@ -551,26 +611,47 @@ function PdaStockDeductionPage() {
       <div className="p-3 space-y-3">
         {/* Scan input */}
         {!isCompleted && (
-          <form onSubmit={handleScan}>
-            <div className="relative">
-              <input
-                ref={inputRef}
-                type="text"
-                value={serial}
-                onChange={handleSerialChange}
-                placeholder="สแกน barcode ตัดสต๊อก..."
-                disabled={scanning}
-                className="w-full rounded-xl border-2 border-orange-300 bg-white px-4 py-3 text-center font-mono focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-200 disabled:opacity-50"
-                autoFocus
-                autoComplete="off"
-              />
-              {scanning && (
-                <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-orange-500 border-t-transparent" />
-                </div>
-              )}
-            </div>
-          </form>
+          <div className="space-y-2">
+            <form onSubmit={handleScan}>
+              <div className="relative flex gap-2">
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={serial}
+                  onChange={handleSerialChange}
+                  placeholder="สแกน barcode ตัดสต๊อก..."
+                  disabled={scanning}
+                  className="flex-1 rounded-xl border-2 border-orange-300 bg-white px-4 py-3 text-center font-mono focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-200 disabled:opacity-50"
+                  autoFocus
+                  autoComplete="off"
+                />
+                <button
+                  type="button"
+                  onClick={cameraOpen ? stopCamera : startCamera}
+                  className={`shrink-0 rounded-xl border-2 px-3 py-3 transition-colors ${
+                    cameraOpen
+                      ? 'border-red-300 bg-red-50 text-red-600 hover:bg-red-100'
+                      : 'border-orange-300 bg-white text-orange-600 hover:bg-orange-50'
+                  }`}
+                  title={cameraOpen ? 'ปิดกล้อง' : 'เปิดกล้องสแกน'}
+                >
+                  {cameraOpen ? <CameraOff size={20} /> : <Camera size={20} />}
+                </button>
+                {scanning && (
+                  <div className="absolute right-16 top-1/2 -translate-y-1/2">
+                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-orange-500 border-t-transparent" />
+                  </div>
+                )}
+              </div>
+            </form>
+
+            {/* Camera view */}
+            {cameraOpen && (
+              <div className="overflow-hidden rounded-xl border-2 border-orange-300 bg-black">
+                <div id="pda-camera-scanner" ref={scannerRef} className="w-full" />
+              </div>
+            )}
+          </div>
         )}
 
         {/* Last result flash */}
