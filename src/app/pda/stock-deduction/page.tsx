@@ -291,7 +291,10 @@ function PdaStockDeductionPage() {
 
         await scanner.start(
           { facingMode: 'environment' },
-          { fps: 10, qrbox: { width: 200, height: 200 } },
+          { fps: 10, aspectRatio: 1, qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
+            const size = Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.75);
+            return { width: size, height: size };
+          } },
           (decodedText) => {
             if (cameraScanLockRef.current) return;
             cameraScanLockRef.current = true;
@@ -670,9 +673,8 @@ function PdaStockDeductionPage() {
             </form>
 
             {/* Camera view */}
-            <div className={`relative mx-auto overflow-hidden rounded-xl border-2 border-orange-300 bg-black ${cameraOpen ? '' : 'hidden'}`}
-              style={{ maxWidth: '100%', height: '240px' }}>
-              <div id="pda-camera-scanner" ref={scannerRef} style={{ height: '240px', overflow: 'hidden' }} />
+            <div className={`relative mx-auto overflow-hidden rounded-xl border-2 border-orange-300 bg-black ${cameraOpen ? '' : 'hidden'}`}>
+              <div id="pda-camera-scanner" ref={scannerRef} />
               {/* Scan flash overlay */}
               {cameraScanFlash && (
                 <div className="absolute inset-0 z-10 flex items-center justify-center bg-green-500/70 animate-pulse">
