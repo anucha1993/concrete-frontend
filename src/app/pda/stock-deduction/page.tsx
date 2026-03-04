@@ -646,11 +646,9 @@ function PdaStockDeductionPage() {
             </form>
 
             {/* Camera view */}
-            {cameraOpen && (
-              <div className="overflow-hidden rounded-xl border-2 border-orange-300 bg-black">
-                <div id="pda-camera-scanner" ref={scannerRef} className="w-full" />
-              </div>
-            )}
+            <div className={`overflow-hidden rounded-xl border-2 border-orange-300 bg-black ${cameraOpen ? '' : 'hidden'}`}>
+              <div id="pda-camera-scanner" ref={scannerRef} className="w-full" />
+            </div>
           </div>
         )}
 
