@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { API_BASE_URL } from '@/lib/constants';
 import {
   CheckCircle, XCircle, Clock, X,
-  ArrowLeft, Trash2, TrendingDown, Camera, CameraOff,
+  ArrowLeft, Trash2, TrendingDown, Camera, CameraOff, AlertTriangle,
 } from 'lucide-react';
 
 /* ── Types ── */
@@ -59,11 +59,12 @@ interface ScanResult {
   product_code?: string;
   condition?: string;
   line_progress?: string;
-  status: 'OK' | 'COMPLETED' | 'ERROR';
+  status: 'OK' | 'COMPLETED' | 'ERROR' | 'WARNING';
   success: boolean;
   message: string;
   timestamp: Date;
   serverId?: number;
+  isOverQuantity?: boolean;
 }
 
 /* ── API helper ── */
@@ -200,7 +201,31 @@ function PdaStockDeductionPage() {
         // Auto-select if id from URL
         if (idFromUrl) {
           const found = (res.data ?? []).find((d: ActiveDeduction) => d.id === parseInt(idFromUrl));
-          if (found) setSelectedDeduction(found);
+          if (found) {
+            setSelectedDeduction(found);
+          } else {
+            // Deduction not in active list — might be COMPLETED/APPROVED
+            // Fetch progress directly to show completed state
+            try {
+              const progRes = await pdaApi('GET', `/pda/stock-deductions/${idFromUrl}/progress`, token);
+              if (progRes.success && progRes.data) {
+                const p = progRes.data;
+                setSelectedDeduction({
+                  id: p.id,
+                  code: p.code,
+                  type: '',
+                  type_label: p.type_label,
+                  status: p.status,
+                  customer_name: null,
+                  total_planned: p.total_planned,
+                  total_scanned: p.total_scanned,
+                  scans_count: p.total_scanned,
+                  lines: p.lines,
+                  created_at: '',
+                });
+              }
+            } catch { /* ignore */ }
+          }
         }
       }
     } catch { /* ignore */ }
@@ -347,6 +372,7 @@ function PdaStockDeductionPage() {
         serial_number: s,
       });
 
+      const isOver = !!res.data?.is_over_quantity;
       const result: ScanResult = {
         id: scanId,
         serial_number: s,
@@ -354,22 +380,24 @@ function PdaStockDeductionPage() {
         product_code: res.data?.product_code,
         condition: res.data?.condition,
         line_progress: res.data?.line_progress,
-        status: res.success ? (res.status === 'COMPLETED' ? 'COMPLETED' : 'OK') : 'ERROR',
+        status: res.success ? (isOver ? 'WARNING' : (res.status === 'COMPLETED' ? 'COMPLETED' : 'OK')) : 'ERROR',
         success: res.success,
         message: res.message || (res.success ? 'สแกนสำเร็จ' : 'เกิดข้อผิดพลาด'),
         timestamp: new Date(),
+        isOverQuantity: isOver,
       };
 
       setLastResult(result);
       setResults(prev => [result, ...prev]);
 
-      // Auto-dismiss success flash
+      // Auto-dismiss flash (over-quantity warning stays longer)
       if (res.success) {
-        setTimeout(() => setLastResult(prev => prev?.id === scanId ? null : prev), 2000);
+        const dismissMs = isOver ? 5000 : 2000;
+        setTimeout(() => setLastResult(prev => prev?.id === scanId ? null : prev), dismissMs);
       }
 
-      // Vibrate on error
-      if (!res.success && navigator.vibrate) {
+      // Vibrate on error or over-quantity warning
+      if ((!res.success || isOver) && navigator.vibrate) {
         navigator.vibrate([200, 100, 200]);
       }
 
@@ -600,7 +628,8 @@ function PdaStockDeductionPage() {
   const overallPct = progress
     ? (progress.total_planned > 0 ? Math.round((progress.total_scanned / progress.total_planned) * 100) : 0)
     : 0;
-  const isCompleted = progress?.status === 'COMPLETED';
+  const isCompleted = progress?.status === 'COMPLETED' || progress?.status === 'APPROVED';
+  const isApproved = progress?.status === 'APPROVED';
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50">
@@ -691,18 +720,24 @@ function PdaStockDeductionPage() {
         {/* Last result flash */}
         {lastResult && (
           <div className={`relative rounded-xl px-4 py-3 ${
+            lastResult.status === 'WARNING' ? 'bg-amber-100 border-2 border-amber-400' :
             lastResult.status === 'COMPLETED' ? 'bg-green-100 border border-green-300' :
             lastResult.success ? 'bg-green-50 border border-green-200' :
             'bg-red-50 border border-red-200'
           }`}>
             <div className="flex items-center gap-2">
-              {lastResult.success ? (
+              {lastResult.status === 'WARNING' ? (
+                <AlertTriangle size={18} className="text-amber-600" />
+              ) : lastResult.success ? (
                 <CheckCircle size={18} className={lastResult.status === 'COMPLETED' ? 'text-green-600' : 'text-green-500'} />
               ) : (
                 <XCircle size={18} className="text-red-500" />
               )}
               <div className="flex-1 min-w-0">
-                <span className={`text-sm font-bold ${lastResult.success ? 'text-green-700' : 'text-red-700'}`}>
+                <span className={`text-sm font-bold ${
+                  lastResult.status === 'WARNING' ? 'text-amber-700' :
+                  lastResult.success ? 'text-green-700' : 'text-red-700'
+                }`}>
                   {lastResult.message}
                 </span>
                 {lastResult.serial_number && (
@@ -720,8 +755,35 @@ function PdaStockDeductionPage() {
         {isCompleted && (
           <div className="rounded-xl bg-green-100 border border-green-300 p-5 text-center">
             <CheckCircle size={36} className="mx-auto mb-1 text-green-600" />
-            <h3 className="font-bold text-green-700">สแกนครบแล้ว!</h3>
-            <p className="text-xs text-green-600">รอผู้ดูแลอนุมัติการตัดสต๊อก</p>
+            <h3 className="font-bold text-green-700">
+              {isApproved ? 'อนุมัติตัดสต๊อกแล้ว!' : 'สแกนครบแล้ว!'}
+            </h3>
+            <p className="text-xs text-green-600">
+              {isApproved ? 'เอกสารนี้ได้รับการอนุมัติเรียบร้อยแล้ว' : 'รอผู้ดูแลอนุมัติการตัดสต๊อก'}
+            </p>
+          </div>
+        )}
+
+        {/* Line-by-line progress summary */}
+        {isCompleted && progress?.lines && progress.lines.length > 0 && (
+          <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
+            <div className="border-b bg-gray-50 px-3 py-2">
+              <h3 className="text-xs font-bold text-gray-600">สรุปรายการสินค้า ({progress.lines.length} รายการ)</h3>
+            </div>
+            <div className="divide-y">
+              {progress.lines.map(l => (
+                <div key={l.id} className="flex items-center gap-2 px-3 py-2">
+                  <CheckCircle size={14} className={`shrink-0 ${l.scanned_qty >= l.quantity ? 'text-green-500' : 'text-gray-300'}`} />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-bold text-gray-700 truncate">{l.product_name}</div>
+                    <div className="text-[10px] text-gray-400 font-mono">{l.product_code}</div>
+                  </div>
+                  <span className={`text-xs font-bold ${l.scanned_qty >= l.quantity ? 'text-green-600' : 'text-orange-600'}`}>
+                    {l.scanned_qty}/{l.quantity} {l.unit}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
@@ -733,8 +795,12 @@ function PdaStockDeductionPage() {
           {results.length > 0 ? (
             <div className="max-h-[55vh] overflow-auto divide-y">
               {results.map(r => (
-                <div key={r.id} className={`flex items-center gap-2 px-3 py-2 ${!r.success ? 'bg-red-50' : ''}`}>
-                  {r.success ? (
+                <div key={r.id} className={`flex items-center gap-2 px-3 py-2 ${
+                  r.isOverQuantity ? 'bg-amber-50' : !r.success ? 'bg-red-50' : ''
+                }`}>
+                  {r.isOverQuantity ? (
+                    <AlertTriangle size={14} className="shrink-0 text-amber-500" />
+                  ) : r.success ? (
                     <CheckCircle size={14} className="shrink-0 text-green-500" />
                   ) : (
                     <XCircle size={14} className="shrink-0 text-red-500" />

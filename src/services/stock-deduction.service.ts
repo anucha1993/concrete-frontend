@@ -27,7 +27,7 @@ export interface StockDeductionShowResponse {
 
 export const stockDeductionService = {
   list: async (filters: StockDeductionFilters = {}) => {
-    const res = await api.get<PaginatedResponse<StockDeduction>>('/stock-deductions', { params: filters });
+    const res = await api.get<PaginatedResponse<StockDeduction> & { status_counts?: Record<string, number> }>('/stock-deductions', { params: filters });
     return res.data;
   },
 

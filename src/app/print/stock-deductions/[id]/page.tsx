@@ -22,7 +22,7 @@ const STATUS_LABELS: Record<string, string> = {
   COMPLETED: 'สแกนครบ', APPROVED: 'อนุมัติแล้ว', CANCELLED: 'ยกเลิก',
 };
 
-interface Product { id: number; product_code: string; name: string; counting_unit?: string; }
+interface Product { id: number; product_code: string; name: string; counting_unit?: string; length?: number; thickness?: number; width?: number; }
 interface Line { id: number; product_id: number; product?: Product; quantity: number; scanned_qty: number; note?: string; }
 interface Scan { id: number; serial_number: string; scanned_at: string; stock_deduction_line_id?: number; }
 interface Creator { id: number; name: string; }
@@ -149,12 +149,12 @@ export default function StockDeductionPrintPage() {
         }
         body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 
-        @page { size: A4 portrait; margin: 0 5mm 5mm 5mm; }
+        @page { size: A4 portrait; margin: 0 1mm 5mm 1mm; }
         @media print {
           html, body { background: #fff; margin: 0; padding: 0; }
           .toolbar { display: none !important; }
           .spacer { display: none !important; }
-          .paper { box-shadow: none !important; border: none !important; outline: none !important; margin: 0; padding: 0; width: auto; }
+          .paper { box-shadow: none !important; border: none !important; outline: none !important; margin: 0; padding: 2mm 1mm 0 1mm; width: auto; }
           .sigs { position: fixed; bottom: 0; left: 0; right: 0; margin: 0; padding: 0 8mm 2mm 8mm; }
         }
 
@@ -162,7 +162,7 @@ export default function StockDeductionPrintPage() {
           width: 210mm;
           margin: 10mm auto; background: #fff;
           box-shadow: 0 1px 10px rgba(0,0,0,.12);
-          padding: 10mm 10mm 8mm 10mm;
+          padding: 5mm 1mm 5mm 1mm;
           position: relative;
         }
 
@@ -205,22 +205,22 @@ export default function StockDeductionPrintPage() {
         /* Table */
         table.items { width: 100%; border-collapse: collapse; margin-bottom: 8pt; }
         table.items thead th {
-          background: #222; color: #fff; font-size: 7.5pt; font-weight: 600;
-          padding: 3pt 4pt; text-transform: uppercase; letter-spacing: 0.3pt;
+          background: #222; color: #fff; font-size: 12pt; font-weight: 700;
+          padding: 4pt 5pt; text-transform: uppercase; letter-spacing: 0.3pt;
         }
         table.items thead th:first-child { border-radius: 3pt 0 0 0; }
         table.items thead th:last-child { border-radius: 0 3pt 0 0; }
-        table.items tbody td { padding: 2.5pt 4pt; border-bottom: 0.5pt solid #e8e8e8; font-size: 8.5pt; }
+        table.items tbody td { padding: 4pt 5pt; border-bottom: 0.5pt solid #e8e8e8; font-size: 16px; }
         table.items tbody tr:nth-child(even) { background: #fafbfc; }
-        table.items tbody td.sn { font-family: 'Courier New', monospace; font-size: 7.5pt; word-break: break-all; }
+        table.items tbody td.sn { font-family: 'Courier New', monospace; font-size: 14px; word-break: break-all; }
         table.items tfoot td {
-          padding: 3pt 4pt; font-weight: 700; font-size: 9pt;
+          padding: 4pt 5pt; font-weight: 700; font-size: 16px;
           border-top: 1.5pt solid #222; background: #f5f5f5;
         }
         .al { text-align: left; }
         .ac { text-align: center; }
         .ar { text-align: right; }
-        .mono { font-family: 'Courier New', monospace; font-size: 8.5pt; }
+        .mono { font-family: 'Courier New', monospace; font-size: 14px; }
         .muted { color: #999; }
 
         /* Note */
@@ -312,12 +312,12 @@ export default function StockDeductionPrintPage() {
           <thead>
             <tr>
               <th className="ac" style={{ width: 22 }}>ลำดับ</th>
-              <th className="al" style={{ width: 55 }}>รหัสสินค้า</th>
-              <th className="al" style={{ width: 140 }}>S/N</th>
+              <th className="al" style={{ width: 60 }}>รหัสสินค้า</th>
               <th className="al">รายการ</th>
+              <th className="ac" style={{ width: 70 }}>ขนาด</th>
               <th className="ac" style={{ width: 32 }}>หน่วย</th>
               <th className="ac" style={{ width: 34 }}>จำนวน</th>
-              <th className="al" style={{ width: 140 }}>หมายเหตุ</th>
+              <th className="al" style={{ width: 90 }}>หมายเหตุ</th>
             </tr>
           </thead>
           <tbody>
@@ -325,28 +325,33 @@ export default function StockDeductionPrintPage() {
               let rowNum = 0;
               return lines.flatMap((line) => {
                 const lineScans = scansByLine.get(line.id) || [];
+                const dims = [line.product?.length, line.product?.thickness, line.product?.width].filter(v => v != null);
+                const dimStr = dims.length > 0 ? dims.join(' × ') : '-';
                 if (lineScans.length === 0) {
                   rowNum++;
                   return [(
                     <tr key={line.id}>
                       <td className="ac muted">{rowNum}</td>
                       <td className="mono">{line.product?.product_code || '-'}</td>
-                      <td className="sn muted">-</td>
                       <td>{line.product?.name || '-'}</td>
+                      <td className="ac" style={{ fontSize: '8pt' }}>{dimStr}</td>
                       <td className="ac muted">{line.product?.counting_unit || 'ชิ้น'}</td>
                       <td className="ac" style={{ fontWeight: 700 }}>{line.quantity}</td>
                       <td className="muted" style={{ fontSize: '8.5pt' }}>{line.note || '-'}</td>
                     </tr>
                   )];
                 }
-                return lineScans.map((s) => {
+                return lineScans.map((s, idx) => {
                   rowNum++;
                   return (
                     <tr key={`sn-${s.id}`}>
                       <td className="ac muted">{rowNum}</td>
                       <td className="mono">{line.product?.product_code || '-'}</td>
-                      <td className="sn">{s.serial_number}</td>
-                      <td>{line.product?.name || '-'}</td>
+                      <td>
+                        <div>{line.product?.name || '-'}</div>
+                        <div className="sn" style={{ marginTop: 1 }}>{s.serial_number}</div>
+                      </td>
+                      <td className="ac" style={{ fontSize: '8pt' }}>{dimStr}</td>
                       <td className="ac muted">{line.product?.counting_unit || 'ชิ้น'}</td>
                       <td className="ac" style={{ fontWeight: 700 }}>1</td>
                       <td className="muted" style={{ fontSize: '8.5pt' }}>{line.note || '-'}</td>

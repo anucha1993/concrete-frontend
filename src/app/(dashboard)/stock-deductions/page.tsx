@@ -32,6 +32,8 @@ import {
   Pencil,
   Save,
   Printer,
+  AlertTriangle,
+  Clock,
 } from 'lucide-react';
 
 const TYPE_OPTIONS = [
@@ -95,6 +97,7 @@ function StockDeductionsContent() {
 function ListView({ canManage, onView, onCreate }: { canManage: boolean; onView: (id: number) => void; onCreate: () => void }) {
   const [data, setData] = useState<StockDeduction[]>([]);
   const [meta, setMeta] = useState({ current_page: 1, last_page: 1, per_page: 15, total: 0 });
+  const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -112,6 +115,7 @@ function ListView({ canManage, onView, onCreate }: { canManage: boolean; onView:
       });
       setData(res.data);
       setMeta(res.meta);
+      if (res.status_counts) setStatusCounts(res.status_counts);
     } catch {
       toast('โหลดข้อมูลไม่สำเร็จ', 'error');
     } finally {
@@ -160,8 +164,57 @@ function ListView({ canManage, onView, onCreate }: { canManage: boolean; onView:
     },
   ];
 
+  const STATUS_CARDS: { key: string; label: string; icon: typeof FileText; bg: string; text: string; border: string }[] = [
+    { key: 'DRAFT', label: 'แบบร่าง', icon: FileText, bg: 'bg-gray-50', text: 'text-gray-600', border: 'border-gray-200' },
+    { key: 'PENDING', label: 'รอสแกน', icon: Clock, bg: 'bg-amber-50', text: 'text-amber-600', border: 'border-amber-200' },
+    { key: 'IN_PROGRESS', label: 'กำลังสแกน', icon: ScanBarcode, bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-200' },
+    { key: 'COMPLETED', label: 'สแกนครบ', icon: CheckCircle, bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-200' },
+    { key: 'APPROVED', label: 'อนุมัติแล้ว', icon: ShieldCheck, bg: 'bg-green-50', text: 'text-green-600', border: 'border-green-200' },
+    { key: 'CANCELLED', label: 'ยกเลิก', icon: Ban, bg: 'bg-red-50', text: 'text-red-600', border: 'border-red-200' },
+  ];
+
+  const totalAll = Object.values(statusCounts).reduce((s, v) => s + v, 0);
+
   return (
     <div>
+      {/* Status summary cards */}
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
+        {/* Total card */}
+        <button
+          onClick={() => { setStatusFilter(''); setPage(1); }}
+          className={`rounded-xl border p-3 text-left transition-shadow hover:shadow-md ${
+            statusFilter === '' ? 'ring-2 ring-blue-500 border-blue-300 bg-blue-50' : 'border-gray-200 bg-white'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <Package size={18} className="text-blue-500" />
+            <span className="text-2xl font-bold text-gray-800">{totalAll}</span>
+          </div>
+          <div className="mt-1 text-xs font-medium text-gray-500">ทั้งหมด</div>
+        </button>
+
+        {STATUS_CARDS.map(card => {
+          const Icon = card.icon;
+          const count = statusCounts[card.key] || 0;
+          const isActive = statusFilter === card.key;
+          return (
+            <button
+              key={card.key}
+              onClick={() => { setStatusFilter(isActive ? '' : card.key); setPage(1); }}
+              className={`rounded-xl border p-3 text-left transition-shadow hover:shadow-md ${
+                isActive ? `ring-2 ring-blue-500 border-blue-300 ${card.bg}` : `${card.border} bg-white`
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <Icon size={18} className={card.text} />
+                <span className={`text-2xl font-bold ${card.text}`}>{count}</span>
+              </div>
+              <div className={`mt-1 text-xs font-medium ${card.text}`}>{card.label}</div>
+            </button>
+          );
+        })}
+      </div>
+
       <div className="mb-4 flex flex-wrap items-end gap-3">
         <div className="relative">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -478,7 +531,7 @@ function DetailView({ id, canManage, onBack }: { id: number; canManage: boolean;
   // Scan state
   const [serialInput, setSerialInput] = useState('');
   const [scanning, setScanning] = useState(false);
-  const [lastScanResult, setLastScanResult] = useState<{ success: boolean; message: string; product_name?: string } | null>(null);
+  const [lastScanResult, setLastScanResult] = useState<{ success: boolean; message: string; product_name?: string; isOverQuantity?: boolean } | null>(null);
   const scanInputRef = useRef<HTMLInputElement>(null);
   const scanQueueRef = useRef<string[]>([]);
   const processingQueueRef = useRef(false);
@@ -578,8 +631,9 @@ function DetailView({ id, canManage, onBack }: { id: number; canManage: boolean;
     setLastScanResult(null);
     try {
       const res = await stockDeductionService.scan(deduction.id, s);
-      setLastScanResult({ success: true, message: res.message || 'สแกนสำเร็จ', product_name: res.data?.product_name });
-      setTimeout(() => setLastScanResult(prev => prev?.success ? null : prev), 2000);
+      const isOver = !!res.data?.is_over_quantity;
+      setLastScanResult({ success: true, message: res.message || 'สแกนสำเร็จ', product_name: res.data?.product_name, isOverQuantity: isOver });
+      setTimeout(() => setLastScanResult(prev => prev?.success ? null : prev), isOver ? 5000 : 2000);
       fetchData(true);
     } catch (err: unknown) {
       const ax = err as AxiosError<{ message: string }>;
@@ -842,8 +896,11 @@ function DetailView({ id, canManage, onBack }: { id: number; canManage: boolean;
             </button>
           </form>
           {lastScanResult && (
-            <div className={`mt-2 flex items-center gap-2 rounded-lg px-3 py-2 text-xs ${lastScanResult.success ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-              {lastScanResult.success ? <CheckCircle size={14} /> : <XCircle size={14} />}
+            <div className={`mt-2 flex items-center gap-2 rounded-lg px-3 py-2 text-xs ${
+              lastScanResult.isOverQuantity ? 'bg-amber-100 text-amber-700 border border-amber-300' :
+              lastScanResult.success ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+            }`}>
+              {lastScanResult.isOverQuantity ? <AlertTriangle size={14} /> : lastScanResult.success ? <CheckCircle size={14} /> : <XCircle size={14} />}
               <span className="font-medium">{lastScanResult.message}</span>
               {lastScanResult.product_name && <span className="opacity-75">({lastScanResult.product_name})</span>}
               <button onClick={() => setLastScanResult(null)} className="ml-auto"><X size={12} /></button>
@@ -992,10 +1049,18 @@ function DetailView({ id, canManage, onBack }: { id: number; canManage: boolean;
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className={`text-sm font-bold ${fulfilled ? 'text-green-700' : 'text-gray-800'}`}>{line.product?.name || '-'}</span>
-                      {fulfilled && <CheckCircle size={14} className="shrink-0 text-green-500" />}
+                      {fulfilled && <CheckCircle size={18} className="shrink-0 text-green-500" />}
                     </div>
                     <div className="text-xs text-gray-400 font-mono">{line.product?.product_code}{line.note && ` · ${line.note}`}</div>
                   </div>
+                  {(() => {
+                    const dims = [line.product?.length, line.product?.thickness, line.product?.width].filter(v => v != null);
+                    return dims.length > 0 ? (
+                      <span className="mx-3 rounded-lg bg-blue-50 px-3 py-1 text-sm font-bold tabular-nums text-blue-700 whitespace-nowrap">
+                        {dims.join(' × ')}
+                      </span>
+                    ) : null;
+                  })()}
                   <span className={`text-sm font-bold tabular-nums ${fulfilled ? 'text-green-600' : 'text-gray-600'}`}>
                     {line.scanned_qty}/{line.quantity}
                   </span>

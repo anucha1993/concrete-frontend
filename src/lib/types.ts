@@ -550,7 +550,7 @@ export interface StockDeductionLine {
   quantity: number;
   scanned_qty: number;
   note: string | null;
-  product?: { id: number; product_code: string; name: string; counting_unit?: string };
+  product?: { id: number; product_code: string; name: string; counting_unit?: string; length?: number; thickness?: number; width?: number };
   scans?: StockDeductionScan[];
   created_at: string;
   updated_at: string;
