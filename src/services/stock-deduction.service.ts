@@ -72,7 +72,7 @@ export const stockDeductionService = {
   },
 
   scan: async (id: number, serial_number: string) => {
-    const res = await api.post<ApiResponse<{ serial_number: string; product_name: string; product_code: string; line_progress: string; all_fulfilled: boolean }>>(`/stock-deductions/${id}/scan`, { serial_number });
+    const res = await api.post<ApiResponse<{ serial_number: string; product_name: string; product_code: string; line_progress: string; all_fulfilled: boolean; is_over_quantity?: boolean }>>(`/stock-deductions/${id}/scan`, { serial_number });
     return res.data;
   },
 
