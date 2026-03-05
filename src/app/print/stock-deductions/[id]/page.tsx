@@ -195,11 +195,11 @@ export default function StockDeductionPrintPage() {
         .hdr-right .dt { font-size: 9pt; color: #666; margin-top: 2pt; }
 
         /* Info block */
-        .info { display: grid; grid-template-columns: 1fr 1fr; border: 1pt solid #ccc; margin-bottom: 12pt; }
+        .info { display: grid; grid-template-columns: 2fr 3fr; border: 1pt solid #ccc; margin-bottom: 12pt; }
         .info-item { display: flex; border-bottom: 0.5pt solid #e5e5e5; }
         .info-item:last-child { border-bottom: none; }
-        .info-item .k { width: 65pt; padding: 2.5pt 6pt; font-size: 8pt; font-weight: 600; color: #666; background: #fafafa; border-right: 0.5pt solid #e5e5e5; flex-shrink: 0; }
-        .info-item .v { flex: 1; padding: 2.5pt 6pt; font-size: 9pt; color: #111; }
+        .info-item .k { width: 75pt; padding: 4pt 6pt; font-size: 10pt; font-weight: 600; color: #666; background: #fafafa; border-right: 0.5pt solid #e5e5e5; flex-shrink: 0; }
+        .info-item .v { flex: 1; padding: 4pt 6pt; font-size: 11pt; color: #111; }
         .info-left { border-right: 1pt solid #ccc; }
 
         /* Table */
@@ -312,12 +312,11 @@ export default function StockDeductionPrintPage() {
           <thead>
             <tr>
               <th className="ac" style={{ width: 22 }}>ลำดับ</th>
-              <th className="al" style={{ width: 60 }}>รหัสสินค้า</th>
+              <th className="al" style={{ width: 90 }}>รหัสสินค้า</th>
               <th className="al">รายการ</th>
               <th className="ac" style={{ width: 70 }}>ขนาด</th>
               <th className="ac" style={{ width: 32 }}>หน่วย</th>
               <th className="ac" style={{ width: 34 }}>จำนวน</th>
-              <th className="al" style={{ width: 90 }}>หมายเหตุ</th>
             </tr>
           </thead>
           <tbody>
@@ -337,7 +336,6 @@ export default function StockDeductionPrintPage() {
                       <td className="ac" style={{ fontSize: '8pt' }}>{dimStr}</td>
                       <td className="ac muted">{line.product?.counting_unit || 'ชิ้น'}</td>
                       <td className="ac" style={{ fontWeight: 700 }}>{line.quantity}</td>
-                      <td className="muted" style={{ fontSize: '8.5pt' }}>{line.note || '-'}</td>
                     </tr>
                   )];
                 }
@@ -349,12 +347,11 @@ export default function StockDeductionPrintPage() {
                       <td className="mono">{line.product?.product_code || '-'}</td>
                       <td>
                         <div>{line.product?.name || '-'}</div>
-                        <div className="sn" style={{ marginTop: 1 }}>{s.serial_number}</div>
+                        <div className="sn" style={{ marginTop: 1, fontSize: '7pt', color: '#888' }}>{s.serial_number}</div>
                       </td>
                       <td className="ac" style={{ fontSize: '8pt' }}>{dimStr}</td>
                       <td className="ac muted">{line.product?.counting_unit || 'ชิ้น'}</td>
                       <td className="ac" style={{ fontWeight: 700 }}>1</td>
-                      <td className="muted" style={{ fontSize: '8.5pt' }}>{line.note || '-'}</td>
                     </tr>
                   );
                 });
@@ -365,7 +362,6 @@ export default function StockDeductionPrintPage() {
             <tr>
               <td colSpan={5} className="ar">รวมทั้งสิ้น</td>
               <td className="ac">{totalQty}</td>
-              <td></td>
             </tr>
           </tfoot>
         </table>
