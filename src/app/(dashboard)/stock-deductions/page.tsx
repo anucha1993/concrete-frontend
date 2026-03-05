@@ -384,6 +384,15 @@ function CreateView({ canManage, onBack, onCreated }: { canManage: boolean; onBa
             </div>
           )}
 
+          {form.type === 'SOLD' && (
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">ที่อยู่จัดส่ง</label>
+              <textarea value={form.shipping_address || ''} onChange={e => setForm({ ...form, shipping_address: e.target.value })}
+                rows={3} placeholder="ระบุที่อยู่จัดส่งสินค้า"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" />
+            </div>
+          )}
+
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">เหตุผล</label>
             <textarea value={form.reason || ''} onChange={e => setForm({ ...form, reason: e.target.value })}
@@ -548,7 +557,7 @@ function DetailView({ id, canManage, onBack }: { id: number; canManage: boolean;
 
   // Edit state
   const [editing, setEditing] = useState(false);
-  const [editForm, setEditForm] = useState<{ type: StockDeductionPayload['type']; customer_name: string; reference_doc: string; reason: string; note: string }>({ type: 'SOLD', customer_name: '', reference_doc: '', reason: '', note: '' });
+  const [editForm, setEditForm] = useState<{ type: StockDeductionPayload['type']; customer_name: string; shipping_address: string; reference_doc: string; reason: string; note: string }>({ type: 'SOLD', customer_name: '', shipping_address: '', reference_doc: '', reason: '', note: '' });
   const [editLines, setEditLines] = useState<{ product_id: number; product_code: string; product_name: string; quantity: number; note: string; scanned_qty: number }[]>([]);
   const [saving, setSaving] = useState(false);
   // Edit — product search
@@ -713,6 +722,7 @@ function DetailView({ id, canManage, onBack }: { id: number; canManage: boolean;
     setEditForm({
       type: deduction.type as StockDeductionPayload['type'],
       customer_name: deduction.customer_name || '',
+      shipping_address: deduction.shipping_address || '',
       reference_doc: deduction.reference_doc || '',
       reason: deduction.reason || '',
       note: deduction.note || '',
@@ -853,6 +863,9 @@ function DetailView({ id, canManage, onBack }: { id: number; canManage: boolean;
           <span>ผู้สร้าง: {deduction.creator?.name}</span>
           <span>วันที่: {new Date(deduction.created_at).toLocaleDateString('th-TH')}</span>
         </div>
+        {deduction.shipping_address && (
+          <p className="mt-1 text-xs text-gray-500">📍 ที่อยู่จัดส่ง: {deduction.shipping_address}</p>
+        )}
         {deduction.reason && <p className="mt-1 text-xs text-gray-500">เหตุผล: {deduction.reason}</p>}
         {deduction.note && <p className="text-xs text-gray-400">หมายเหตุ: {deduction.note}</p>}
         {deduction.approver && (
@@ -933,6 +946,14 @@ function DetailView({ id, canManage, onBack }: { id: number; canManage: boolean;
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-600">ชื่อลูกค้า</label>
               <input type="text" value={editForm.customer_name} onChange={e => setEditForm(f => ({ ...f, customer_name: e.target.value }))}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" />
+            </div>
+          )}
+          {editForm.type === 'SOLD' && (
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-600">ที่อยู่จัดส่ง</label>
+              <textarea value={editForm.shipping_address} onChange={e => setEditForm(f => ({ ...f, shipping_address: e.target.value }))} rows={2}
+                placeholder="ระบุที่อยู่จัดส่งสินค้า"
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" />
             </div>
           )}

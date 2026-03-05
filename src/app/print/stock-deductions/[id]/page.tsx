@@ -28,7 +28,7 @@ interface Scan { id: number; serial_number: string; scanned_at: string; stock_de
 interface Creator { id: number; name: string; }
 interface Deduction {
   id: number; code: string; type: string; status: string;
-  customer_name?: string; reference_doc?: string; reason?: string; note?: string;
+  customer_name?: string; shipping_address?: string; reference_doc?: string; reason?: string; note?: string;
   pda_token?: string | null;
   created_at: string; approved_at?: string;
   creator?: Creator; approver?: Creator;
@@ -280,7 +280,6 @@ export default function StockDeductionPrintPage() {
           <div className="info-left">
             <div className="info-item"><div className="k">ประเภท</div><div className="v">{TYPE_LABELS[data.type] || data.type}</div></div>
             <div className="info-item"><div className="k">สถานะ</div><div className="v" style={{ fontWeight: 700 }}>{STATUS_LABELS[data.status] || data.status}</div></div>
-            {data.customer_name && <div className="info-item"><div className="k">ลูกค้า</div><div className="v">{data.customer_name}</div></div>}
             {data.reference_doc && <div className="info-item"><div className="k">เลขที่อ้างอิง</div><div className="v">{data.reference_doc}</div></div>}
           </div>
           <div className="info-right">
@@ -288,6 +287,7 @@ export default function StockDeductionPrintPage() {
             <div className="info-item"><div className="k">วันที่สร้าง</div><div className="v">{fmtShortDate(data.created_at)}</div></div>
             {data.approver && <div className="info-item"><div className="k">ผู้อนุมัติ</div><div className="v">{data.approver.name}</div></div>}
             {data.approved_at && <div className="info-item"><div className="k">วันที่อนุมัติ</div><div className="v">{fmtShortDate(data.approved_at)}</div></div>}
+            {data.shipping_address && <div className="info-item"><div className="k">ที่อยู่จัดส่ง</div><div className="v" style={{ whiteSpace: 'pre-wrap' }}>{data.shipping_address}</div></div>}
           </div>
         </div>
 

@@ -525,6 +525,7 @@ export interface StockDeduction {
   status: StockDeductionStatus;
   status_label?: string;
   customer_name: string | null;
+  shipping_address: string | null;
   reference_doc: string | null;
   reason: string | null;
   note: string | null;
@@ -580,6 +581,7 @@ export interface StockDeductionScan {
 export interface StockDeductionPayload {
   type: StockDeductionType;
   customer_name?: string;
+  shipping_address?: string;
   reference_doc?: string;
   reason?: string;
   note?: string;
