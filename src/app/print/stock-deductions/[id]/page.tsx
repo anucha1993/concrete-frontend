@@ -155,7 +155,7 @@ export default function StockDeductionPrintPage() {
           .toolbar { display: none !important; }
           .spacer { display: none !important; }
           .paper { box-shadow: none !important; border: none !important; outline: none !important; margin: 0; padding: 2mm 1mm 0 1mm; width: auto; }
-          .sigs { position: fixed; bottom: 0; left: 0; right: 0; margin: 0; padding: 0 8mm 2mm 8mm; }
+          .sigs { page-break-inside: avoid; margin-top: 20pt; padding: 0 8mm 2mm 8mm; }
         }
 
         .paper {
@@ -210,11 +210,11 @@ export default function StockDeductionPrintPage() {
         }
         table.items thead th:first-child { border-radius: 3pt 0 0 0; }
         table.items thead th:last-child { border-radius: 0 3pt 0 0; }
-        table.items tbody td { padding: 4pt 5pt; border-bottom: 0.5pt solid #e8e8e8; font-size: 16px; }
+        table.items tbody td { padding: 4pt 5pt; border-bottom: 0.5pt solid #e8e8e8; font-size: 16px; line-height: 1.4; vertical-align: middle; }
         table.items tbody tr:nth-child(even) { background: #fafbfc; }
         table.items tbody td.sn { font-family: 'Courier New', monospace; font-size: 14px; word-break: break-all; }
         table.items tfoot td {
-          padding: 4pt 5pt; font-weight: 700; font-size: 16px;
+          padding: 8pt 5pt; font-weight: 700; font-size: 16px; line-height: 1.4;
           border-top: 1.5pt solid #222; background: #f5f5f5;
         }
         .al { text-align: left; }
@@ -309,6 +309,7 @@ export default function StockDeductionPrintPage() {
 
         {/* Items table */}
         <table className="items">
+
           <thead>
             <tr>
               <th className="ac" style={{ width: 22 }}>ลำดับ</th>
@@ -319,6 +320,7 @@ export default function StockDeductionPrintPage() {
               <th className="ac" style={{ width: 34 }}>จำนวน</th>
             </tr>
           </thead>
+
           <tbody>
             {(() => {
               let rowNum = 0;
@@ -347,7 +349,7 @@ export default function StockDeductionPrintPage() {
                       <td className="mono">{line.product?.product_code || '-'}</td>
                       <td>
                         <div>{line.product?.name || '-'}</div>
-                        <div className="sn" style={{ marginTop: 1, fontSize: '7pt', color: '#888' }}>{s.serial_number}</div>
+                        <div className="sn" style={{ marginTop: 3, fontSize: '10pt', color: '#888' }}>{s.serial_number}</div>
                       </td>
                       <td className="ac" style={{ fontSize: '8pt' }}>{dimStr}</td>
                       <td className="ac muted">{line.product?.counting_unit || 'ชิ้น'}</td>
