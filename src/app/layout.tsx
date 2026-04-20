@@ -5,6 +5,10 @@ import ToastContainer from "@/components/ui/Toast";
 export const metadata: Metadata = {
   title: "Stock Concrete - ระบบจัดการคลังคอนกรีต",
   description: "ระบบจัดการสินค้าคอนกรีตสำเร็จรูป รองรับ Barcode/QR Scanner",
+  icons: {
+    icon: "/logo1.png",
+    apple: "/logo1.png",
+  },
 };
 
 export default function RootLayout({
