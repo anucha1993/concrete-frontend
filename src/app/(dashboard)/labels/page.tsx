@@ -767,13 +767,17 @@ function PrintPreviewModal({ items, paperSize, customTemplateData, printing, onC
     console.log('[buildLabelHtml] firstPage fields:', firstPage.map(f => ({ name: f.name, type: f.type, position: f.position, width: f.width, height: f.height, rotate: f.rotate })));
     const now = new Date();
     const dateStr = now.toLocaleDateString('th-TH', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const rawSteelType = inv.product?.steel_type?.trim();
+    const nameSteelType = inv.product?.name?.match(/ลวด\s*\d+\s*เส้น/)?.[0]?.replace(/\s+/g, ' ').trim();
+    const categorySteelType = inv.product?.category?.name?.includes('ลวด') ? inv.product.category.name : '';
+    const steelType = rawSteelType || nameSteelType || categorySteelType || '-';
     const input: Record<string, string> = {
       serial_number: inv.serial_number,
       po_number: poOrderNumber,
       product_name: inv.product?.name || '-',
       product_code: inv.product?.product_code || '-',
       category_name: inv.product?.category?.name || '-',
-      steel_type: inv.product?.steel_type || '-',
+      steel_type: steelType,
       product_length: inv.product?.length != null ? `${inv.product.length}` : '-',
       product_thickness: inv.product?.thickness != null ? `${inv.product.thickness}` : '-',
       product_width: inv.product?.width != null ? `${inv.product.width}` : '-',
