@@ -773,6 +773,7 @@ function PrintPreviewModal({ items, paperSize, customTemplateData, printing, onC
       product_name: inv.product?.name || '-',
       product_code: inv.product?.product_code || '-',
       category_name: inv.product?.category?.name || '-',
+      steel_type: inv.product?.steel_type || '-',
       product_length: inv.product?.length != null ? `${inv.product.length}` : '-',
       product_thickness: inv.product?.thickness != null ? `${inv.product.thickness}` : '-',
       product_width: inv.product?.width != null ? `${inv.product.width}` : '-',
