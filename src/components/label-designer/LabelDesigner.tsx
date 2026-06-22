@@ -48,6 +48,7 @@ const LABEL_FIELDS = [
   { name: 'product_code', label: 'รหัสสินค้า', example: 'CON-240', fieldType: 'text' as const },
   { name: 'category_name', label: 'หมวดหมู่สินค้า', example: 'แผ่นพื้น', fieldType: 'text' as const },
   { name: 'steel_type', label: 'ประเภทลวด/เหล็ก', example: 'ลวด 5 เส้น', fieldType: 'text' as const },
+  { name: 'side_steel_type', label: 'เหล็กข้าง', example: 'แสดงเหล็กข้าง', fieldType: 'text' as const },
   { name: 'product_length', label: 'ความยาวสินค้า', example: '1.00', fieldType: 'text' as const },
   { name: 'product_thickness', label: 'ความหนาสินค้า', example: '0.05', fieldType: 'text' as const },
   { name: 'product_width', label: 'ความกว้างสินค้า', example: '0.35', fieldType: 'text' as const },

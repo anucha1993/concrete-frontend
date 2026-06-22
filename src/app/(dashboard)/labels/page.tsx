@@ -771,6 +771,8 @@ function PrintPreviewModal({ items, paperSize, customTemplateData, printing, onC
     const nameSteelType = inv.product?.name?.match(/ลวด\s*\d+\s*เส้น/)?.[0]?.replace(/\s+/g, ' ').trim();
     const categorySteelType = inv.product?.category?.name?.includes('ลวด') ? inv.product.category.name : '';
     const steelType = rawSteelType || nameSteelType || categorySteelType || '-';
+    const sideSteelMap: Record<string, string> = { SHOW: 'แสดงเหล็กข้าง', HIDE: 'ไม่แสดงเหล็กข้าง', NONE: '-' };
+    const sideSteelType = sideSteelMap[inv.product?.side_steel_type ?? 'NONE'] ?? '-';
     const input: Record<string, string> = {
       serial_number: inv.serial_number,
       po_number: poOrderNumber,
@@ -778,6 +780,7 @@ function PrintPreviewModal({ items, paperSize, customTemplateData, printing, onC
       product_code: inv.product?.product_code || '-',
       category_name: inv.product?.category?.name || '-',
       steel_type: steelType,
+      side_steel_type: sideSteelType,
       product_length: inv.product?.length != null ? `${inv.product.length}` : '-',
       product_thickness: inv.product?.thickness != null ? `${inv.product.thickness}` : '-',
       product_width: inv.product?.width != null ? `${inv.product.width}` : '-',
