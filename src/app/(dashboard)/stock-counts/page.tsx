@@ -1756,7 +1756,8 @@ function MissingSerialsRow({
     setSelected(new Set());
     (async () => {
       try {
-        const res = await stockCountService.missingSerials(scId, { product_id: productId });
+        // per_page high to load ALL missing serials for the product (default paginates at 100)
+        const res = await stockCountService.missingSerials(scId, { product_id: productId, per_page: 100000 });
         if (!cancelled) setSerials(res.data ?? []);
       } catch { /* ignore */ }
       if (!cancelled) setLoading(false);
