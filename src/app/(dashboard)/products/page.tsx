@@ -16,6 +16,23 @@ import type { Product, ProductPayload, Category } from '@/lib/types';
 import { Plus, Search, Pencil, Trash2 } from 'lucide-react';
 import { AxiosError } from 'axios';
 
+const SORT_MAP: Record<string, { by: string; dir: string }> = {
+  length_asc:  { by: 'length,steel_type', dir: 'asc,asc' },
+  length_desc: { by: 'length,steel_type', dir: 'desc,asc' },
+  wire_asc:    { by: 'steel_type,length', dir: 'asc,asc' },
+  wire_desc:   { by: 'steel_type,length', dir: 'desc,asc' },
+  latest:      { by: 'created_at', dir: 'desc' },
+};
+
+const LENGTH_UNIT_LABEL: Record<string, string> = {
+  meter: 'ม.', centimeter: 'ซม.', millimeter: 'มม.', inch: 'นิ้ว',
+};
+
+function formatLength(p: Product): string {
+  if (p.length == null) return '-';
+  return `${p.length} ${LENGTH_UNIT_LABEL[p.length_unit] ?? p.length_unit ?? ''}`.trim();
+}
+
 export default function ProductsPage() {
   return (
     <AuthGuard permission="view_products">
@@ -38,6 +55,7 @@ function ProductsContent() {
   const [search, setSearch] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
   const [filterSizeType, setFilterSizeType] = useState('');
+  const [sort, setSort] = useState('length_asc');
   const [page, setPage] = useState(1);
 
   // Modal state
@@ -54,6 +72,9 @@ function ProductsContent() {
       if (search) filters.search = search;
       if (filterCategory) filters.category_id = Number(filterCategory);
       if (filterSizeType) filters.size_type = filterSizeType;
+      const s = SORT_MAP[sort] ?? SORT_MAP.length_asc;
+      filters.sort_by = s.by;
+      filters.sort_dir = s.dir;
 
       const res = await productService.list(filters);
       setProducts(res.data);
@@ -63,7 +84,7 @@ function ProductsContent() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, filterCategory, filterSizeType]);
+  }, [page, search, filterCategory, filterSizeType, sort]);
 
   useEffect(() => {
     fetchProducts();
@@ -136,6 +157,8 @@ function ProductsContent() {
     )},
     { key: 'name', label: 'ชื่อสินค้า' },
     { key: 'category', label: 'หมวดหมู่', render: (p: Product) => p.category?.name || '-' },
+    { key: 'length', label: 'ความยาว', render: (p: Product) => formatLength(p) },
+    { key: 'steel_type', label: 'ขนาดลวด', render: (p: Product) => p.steel_type || '-' },
     { key: 'size_type', label: 'ประเภทไซส์', render: (p: Product) => (
       <Badge variant={p.size_type === 'STANDARD' ? 'info' : 'warning'}>{p.size_type}</Badge>
     )},
@@ -204,6 +227,18 @@ function ProductsContent() {
           <option value="">ทุกไซส์</option>
           <option value="STANDARD">STANDARD</option>
           <option value="CUSTOM">CUSTOM</option>
+        </select>
+
+        <select
+          value={sort}
+          onChange={(e) => { setSort(e.target.value); setPage(1); }}
+          className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+        >
+          <option value="length_asc">ความยาว: น้อย → มาก</option>
+          <option value="length_desc">ความยาว: มาก → น้อย</option>
+          <option value="wire_asc">ขนาดลวด: น้อย → มาก</option>
+          <option value="wire_desc">ขนาดลวด: มาก → น้อย</option>
+          <option value="latest">ล่าสุด</option>
         </select>
       </div>
 

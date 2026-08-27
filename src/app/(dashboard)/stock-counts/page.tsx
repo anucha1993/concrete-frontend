@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import AuthGuard from '@/components/AuthGuard';
 import PageHeader from '@/components/ui/PageHeader';
 import DataTable from '@/components/ui/DataTable';
@@ -317,6 +318,43 @@ function StockCountsContent() {
     try {
       const res = await stockCountService.resolveScan(selectedCount.id, {
         scan_id: scanId,
+        action,
+        product_id: productId,
+        location_id: locationId,
+      });
+      toast(res.message || 'บันทึกแล้ว', 'success');
+      await refreshDetail(selectedCount.id);
+    } catch (err) {
+      const msg = err instanceof AxiosError ? err.response?.data?.message : 'เกิดข้อผิดพลาด';
+      toast(msg || 'บันทึกไม่สำเร็จ', 'error');
+      // Revert on error
+      await refreshDetail(selectedCount.id);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleResolveScanBulk = async (
+    scanIds: number[],
+    action: 'IMPORT' | 'IGNORE',
+    productId?: number,
+    locationId?: number,
+  ) => {
+    if (!selectedCount || scanIds.length === 0) return;
+    // Optimistic update — mark all selected scans immediately
+    const resolvedProduct = productId ? products.find(p => p.id === productId) : undefined;
+    const idSet = new Set(scanIds);
+    setUnexpectedScans(prev => prev.map(s => idSet.has(s.id) ? {
+      ...s,
+      resolution: action,
+      ...(action === 'IMPORT' && resolvedProduct
+        ? { resolution_product: { id: resolvedProduct.id, product_code: resolvedProduct.product_code, name: resolvedProduct.name } }
+        : {}),
+    } : s));
+    setActionLoading(true);
+    try {
+      const res = await stockCountService.resolveScansBulk(selectedCount.id, {
+        scan_ids: scanIds,
         action,
         product_id: productId,
         location_id: locationId,
@@ -872,6 +910,7 @@ function StockCountsContent() {
             onPrintReport={() => handlePrintReport(selectedCount.id)}
             onResolveSerial={handleResolveSerial}
             onResolveScan={handleResolveScan}
+            onResolveScanBulk={handleResolveScanBulk}
             pdaTokens={pdaTokens}
             copied={copiedId === selectedCount.id}
           />
@@ -953,6 +992,109 @@ function StockCountsContent() {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
+   Searchable Product Combobox (portal dropdown — never clipped)
+   ═══════════════════════════════════════════════════════════════════ */
+
+function ProductCombobox({
+  products, value, onChange, placeholder = '-- ค้นหา / เลือกสินค้า --',
+}: {
+  products: Product[];
+  value: number | null;
+  onChange: (id: number | null) => void;
+  placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [rect, setRect] = useState<{ top: number; left: number; width: number } | null>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const selected = products.find(p => p.id === value) ?? null;
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? products.filter(p => `${p.product_code} ${p.name}`.toLowerCase().includes(q))
+    : products;
+
+  const updateRect = useCallback(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    setRect({ top: r.bottom + 4, left: r.left, width: r.width });
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    updateRect();
+    const onMove = () => updateRect();
+    window.addEventListener('scroll', onMove, true);
+    window.addEventListener('resize', onMove);
+    return () => {
+      window.removeEventListener('scroll', onMove, true);
+      window.removeEventListener('resize', onMove);
+    };
+  }, [open, updateRect]);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      const t = e.target as HTMLElement;
+      if (wrapRef.current?.contains(t)) return;
+      if (t.closest?.('[data-product-combobox]')) return;
+      setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') setOpen(false);
+    else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (open && filtered.length > 0) { onChange(filtered[0].id); setOpen(false); setQuery(''); }
+    }
+  };
+
+  return (
+    <div ref={wrapRef} className="relative">
+      <Search size={13} className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
+      <input
+        ref={inputRef}
+        type="text"
+        value={open ? query : (selected ? `${selected.product_code} — ${selected.name}` : '')}
+        onChange={e => { setQuery(e.target.value); if (!open) setOpen(true); }}
+        onFocus={() => { setOpen(true); setQuery(''); updateRect(); }}
+        onKeyDown={handleKeyDown}
+        placeholder={placeholder}
+        className="w-full rounded border border-gray-300 py-1 pl-7 pr-2 text-xs focus:border-blue-500 focus:outline-none"
+      />
+      {open && rect && createPortal(
+        <div
+          data-product-combobox
+          style={{ position: 'fixed', top: rect.top, left: rect.left, width: rect.width, zIndex: 9999 }}
+          className="max-h-60 overflow-auto rounded-lg border border-gray-200 bg-white shadow-xl"
+        >
+          {filtered.length === 0 ? (
+            <div className="px-3 py-2 text-xs text-gray-400">ไม่พบสินค้า</div>
+          ) : (
+            filtered.map(p => (
+              <button
+                key={p.id}
+                type="button"
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => { onChange(p.id); setOpen(false); setQuery(''); }}
+                className={`block w-full px-3 py-1.5 text-left text-xs hover:bg-blue-50 ${p.id === value ? 'bg-blue-50 font-medium text-blue-700' : 'text-gray-700'}`}
+              >
+                <span className="font-mono text-gray-500">{p.product_code}</span> — {p.name}
+              </button>
+            ))
+          )}
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
    Detail View Component
    ═══════════════════════════════════════════════════════════════════ */
 
@@ -974,6 +1116,7 @@ interface DetailViewProps {
   onPrintReport: () => void;
   onResolveSerial: (inventoryId: number, action: 'WRITE_OFF' | 'KEEP') => void;
   onResolveScan: (scanId: number, action: 'IMPORT' | 'IGNORE', productId?: number, locationId?: number) => void;
+  onResolveScanBulk: (scanIds: number[], action: 'IMPORT' | 'IGNORE', productId?: number, locationId?: number) => void;
   pdaTokens: Array<{ id: number; token: string; name: string; is_valid: boolean }>;
   copied: boolean;
 }
@@ -981,7 +1124,7 @@ interface DetailViewProps {
 function DetailView({
   sc, stats, unexpectedScans, unresolved, missingByProduct, actionLoading, products, locations,
   onStart, onComplete, onCancel, onApprove, onViewScans, onCopyPdaUrl, onPrintReport,
-  onResolveSerial, onResolveScan, pdaTokens, copied,
+  onResolveSerial, onResolveScan, onResolveScanBulk, pdaTokens, copied,
 }: DetailViewProps) {
   const statusInfo = STATUS_MAP[sc.status];
   const isInProgress = sc.status === 'IN_PROGRESS';
@@ -1017,6 +1160,37 @@ function DetailView({
     product_id: null,
     location_id: null,
   });
+
+  /* ─── Mass Update state (bulk-import many unexpected scans at once) ─── */
+  const [selectedScanIds, setSelectedScanIds] = useState<Set<number>>(new Set());
+  const [bulkProduct, setBulkProduct] = useState<number | null>(null);
+  const [bulkLocation, setBulkLocation] = useState<number | null>(null);
+  const selectableScans = unexpectedScans.filter(s => !s.resolution);
+  const allSelected = selectableScans.length > 0 && selectableScans.every(s => selectedScanIds.has(s.id));
+  const toggleSelectAll = () => {
+    setSelectedScanIds(allSelected ? new Set() : new Set(selectableScans.map(s => s.id)));
+  };
+  const toggleSelectOne = (id: number) => {
+    setSelectedScanIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+  const applyBulk = (action: 'IMPORT' | 'IGNORE') => {
+    const ids = Array.from(selectedScanIds);
+    if (ids.length === 0) return;
+    onResolveScanBulk(
+      ids,
+      action,
+      action === 'IMPORT' ? (bulkProduct ?? undefined) : undefined,
+      action === 'IMPORT' ? (bulkLocation ?? undefined) : undefined,
+    );
+    setSelectedScanIds(new Set());
+    setBulkProduct(null);
+    setBulkLocation(null);
+  };
 
   return (
     <div className="space-y-5">
@@ -1197,10 +1371,80 @@ function DetailView({
             <AlertTriangle size={14} className="text-amber-500" />
             สินค้านอกรายการ ({unexpectedScans.length})
           </h3>
+
+          {/* ─── Mass Update toolbar (bulk import many scans at once) ─── */}
+          {isInProgress && selectableScans.length > 0 && (
+            <div className="mb-2 rounded-lg border border-blue-200 bg-blue-50 p-2.5">
+              <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-blue-800">
+                <CheckCircle size={14} /> Mass Update — เลือกหลายรายการแล้วนำเข้าพร้อมกัน
+              </div>
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <button
+                  type="button"
+                  onClick={toggleSelectAll}
+                  className="rounded border border-blue-300 bg-white px-2 py-1 font-medium text-blue-700 hover:bg-blue-100"
+                >
+                  {allSelected ? 'ล้างการเลือก' : `เลือกทั้งหมด (${selectableScans.length})`}
+                </button>
+                <span className="font-medium text-gray-600">เลือกแล้ว {selectedScanIds.size} รายการ</span>
+                <div className="min-w-[240px]">
+                  <ProductCombobox
+                    products={products}
+                    value={bulkProduct}
+                    onChange={setBulkProduct}
+                  />
+                </div>
+                <select
+                  value={bulkLocation ?? ''}
+                  onChange={(e) => setBulkLocation(e.target.value ? Number(e.target.value) : null)}
+                  className="rounded border border-gray-200 px-2 py-1 text-xs"
+                >
+                  <option value="">-- เลือกคลัง --</option>
+                  {locations.map(l => (
+                    <option key={l.id} value={l.id}>{l.code} — {l.name}</option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => applyBulk('IMPORT')}
+                  disabled={actionLoading || selectedScanIds.size === 0 || !bulkProduct || !bulkLocation}
+                  className="rounded bg-green-500 px-2.5 py-1 font-medium text-white hover:bg-green-600 disabled:opacity-50"
+                >
+                  นำเข้าที่เลือก ({selectedScanIds.size})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyBulk('IGNORE')}
+                  disabled={actionLoading || selectedScanIds.size === 0}
+                  className="rounded bg-gray-200 px-2.5 py-1 font-medium text-gray-700 hover:bg-gray-300 disabled:opacity-50"
+                >
+                  ไม่นำเข้าที่เลือก
+                </button>
+              </div>
+              {selectedScanIds.size > 0 && (!bulkProduct || !bulkLocation) && (
+                <div className="mt-1.5 text-[11px] text-amber-600">
+                  * เลือกสินค้าและคลังก่อน จึงจะกด &quot;นำเข้าที่เลือก&quot; ได้
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="max-h-[30vh] overflow-y-auto rounded-lg border border-amber-200">
             <table className="min-w-full divide-y divide-gray-200 text-sm">
               <thead className="bg-amber-50 sticky top-0">
                 <tr>
+                  {isInProgress && (
+                    <th className="px-3 py-2 text-left font-medium text-gray-600 w-8">
+                      <input
+                        type="checkbox"
+                        checked={allSelected}
+                        onChange={toggleSelectAll}
+                        disabled={selectableScans.length === 0}
+                        className="h-4 w-4 accent-blue-600"
+                        aria-label="เลือกทั้งหมด"
+                      />
+                    </th>
+                  )}
                   <th className="px-3 py-2 text-left font-medium text-gray-600">Serial</th>
                   <th className="px-3 py-2 text-left font-medium text-gray-600">สินค้า</th>
                   <th className="px-3 py-2 text-left font-medium text-gray-600">สถานะ</th>
@@ -1213,7 +1457,22 @@ function DetailView({
                   const isImportTarget = importTarget === scan.id;
 
                   return (
-                    <tr key={scan.id} className={`hover:bg-gray-50 ${!scan.resolution ? 'bg-amber-50/30' : ''}`}>
+                    <tr key={scan.id} className={`hover:bg-gray-50 ${!scan.resolution ? 'bg-amber-50/30' : ''} ${isInProgress && selectedScanIds.has(scan.id) ? 'bg-blue-50/60' : ''}`}>
+                      {isInProgress && (
+                        <td className="px-3 py-2">
+                          {!scan.resolution ? (
+                            <input
+                              type="checkbox"
+                              checked={selectedScanIds.has(scan.id)}
+                              onChange={() => toggleSelectOne(scan.id)}
+                              className="h-4 w-4 accent-blue-600"
+                              aria-label={`เลือก ${scan.serial_number}`}
+                            />
+                          ) : (
+                            <span className="inline-block h-4 w-4" />
+                          )}
+                        </td>
+                      )}
                       <td className="px-3 py-2 font-mono text-xs">{scan.serial_number}</td>
                       <td className="px-3 py-2">
                         {(scan.product || scan.resolution_product) ? (
@@ -1247,16 +1506,11 @@ function DetailView({
                         ) : isImportTarget ? (
                           /* Import form for scans needing product + location */
                           <div className="space-y-2">
-                            <select
-                              value={importForm.product_id ?? ''}
-                              onChange={(e) => setImportForm(f => ({ ...f, product_id: e.target.value ? Number(e.target.value) : null }))}
-                              className="w-full rounded border border-gray-200 px-2 py-1 text-xs"
-                            >
-                              <option value="">-- เลือกสินค้า --</option>
-                              {products.map(p => (
-                                <option key={p.id} value={p.id}>{p.product_code} — {p.name}</option>
-                              ))}
-                            </select>
+                            <ProductCombobox
+                              products={products}
+                              value={importForm.product_id}
+                              onChange={(id) => setImportForm(f => ({ ...f, product_id: id }))}
+                            />
                             <select
                               value={importForm.location_id ?? ''}
                               onChange={(e) => setImportForm(f => ({ ...f, location_id: e.target.value ? Number(e.target.value) : null }))}

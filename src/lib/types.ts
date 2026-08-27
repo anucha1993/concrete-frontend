@@ -514,6 +514,13 @@ export interface StockCountResolveScanPayload {
   location_id?: number;
 }
 
+export interface StockCountResolveScanBulkPayload {
+  scan_ids: number[];
+  action: 'IMPORT' | 'IGNORE';
+  product_id?: number;
+  location_id?: number;
+}
+
 // ─── Stock Deductions (ตัดสต๊อก) ─────────────────────────────────
 export type StockDeductionType = 'SOLD' | 'LOST' | 'DAMAGED' | 'OTHER';
 export type StockDeductionStatus = 'DRAFT' | 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'APPROVED' | 'CANCELLED';

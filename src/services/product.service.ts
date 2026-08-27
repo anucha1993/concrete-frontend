@@ -9,7 +9,7 @@ export interface ProductFilters {
   is_active?: boolean;
   search?: string;
   sort_by?: string;
-  sort_dir?: 'asc' | 'desc';
+  sort_dir?: string;
   with_stock?: boolean;
 }
 

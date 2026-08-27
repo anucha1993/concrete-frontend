@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import AuthGuard from '@/components/AuthGuard';
 import PageHeader from '@/components/ui/PageHeader';
@@ -277,6 +277,68 @@ function ProductionOrdersContent() {
   );
 }
 
+/* ── Searchable Pack Select ── */
+function PackCombobox({ packs, value, onChange }: {
+  packs: Pack[]; value: number; onChange: (id: number) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const selected = packs.find(p => p.id === value);
+  const q = query.trim().toLowerCase();
+  const filtered = q ? packs.filter(p => `${p.code} ${p.name}`.toLowerCase().includes(q)) : packs;
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') setOpen(false);
+    else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (open && filtered.length > 0) { onChange(filtered[0].id); setOpen(false); setQuery(''); }
+    }
+  };
+
+  return (
+    <div ref={ref} className="relative">
+      <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+      <input
+        type="text"
+        value={open ? query : (selected ? `${selected.code} - ${selected.name}` : '')}
+        onChange={e => { setQuery(e.target.value); if (!open) setOpen(true); }}
+        onFocus={() => { setOpen(true); setQuery(''); }}
+        onKeyDown={handleKeyDown}
+        placeholder="-- ค้นหา / เลือกแพสินค้า --"
+        className="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm focus:border-blue-500 focus:outline-none"
+      />
+      {open && (
+        <div className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+          {filtered.length === 0 ? (
+            <div className="px-3 py-2 text-sm text-gray-400">ไม่พบแพสินค้า</div>
+          ) : (
+            filtered.map(p => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => { onChange(p.id); setOpen(false); setQuery(''); }}
+                className={`block w-full px-3 py-2 text-left text-sm hover:bg-blue-50 ${p.id === value ? 'bg-blue-50 font-medium text-blue-700' : 'text-gray-700'}`}
+              >
+                {p.code} - {p.name}
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ── Create Order Form ── */
 function CreateOrderForm({ packs, locations, onSubmit, onCancel, saving }: {
   packs: Pack[]; locations: Location[];
@@ -304,11 +366,7 @@ function CreateOrderForm({ packs, locations, onSubmit, onCancel, saving }: {
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-700">แพสินค้า *</label>
-        <select value={packId} onChange={e => setPackId(Number(e.target.value))}
-          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none">
-          <option value={0}>-- เลือกแพสินค้า --</option>
-          {packs.map(p => <option key={p.id} value={p.id}>{p.code} - {p.name}</option>)}
-        </select>
+        <PackCombobox packs={packs} value={packId} onChange={setPackId} />
       </div>
 
       {selectedPack?.items && (
