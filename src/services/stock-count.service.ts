@@ -6,6 +6,7 @@ import type {
   StockCountPayload,
   StockCountUnresolved,
   StockCountResolveSerialPayload,
+  StockCountResolveSerialBulkPayload,
   StockCountResolveScanPayload,
   StockCountResolveScanBulkPayload,
   ApiResponse,
@@ -82,6 +83,14 @@ export const stockCountService = {
   resolveSerial: async (id: number, payload: StockCountResolveSerialPayload) => {
     const { data } = await api.post<ApiResponse<null>>(
       `/stock-counts/${id}/resolve-serial`,
+      payload
+    );
+    return data;
+  },
+
+  resolveSerialsBulk: async (id: number, payload: StockCountResolveSerialBulkPayload) => {
+    const { data } = await api.post<ApiResponse<null>>(
+      `/stock-counts/${id}/resolve-serials-bulk`,
       payload
     );
     return data;

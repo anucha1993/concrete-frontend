@@ -507,6 +507,11 @@ export interface StockCountResolveSerialPayload {
   action: 'WRITE_OFF' | 'KEEP';
 }
 
+export interface StockCountResolveSerialBulkPayload {
+  inventory_ids: number[];
+  action: 'WRITE_OFF' | 'KEEP';
+}
+
 export interface StockCountResolveScanPayload {
   scan_id: number;
   action: 'IMPORT' | 'IGNORE';

@@ -305,6 +305,21 @@ function StockCountsContent() {
     }
   };
 
+  const handleResolveSerialBulk = async (inventoryIds: number[], action: 'WRITE_OFF' | 'KEEP') => {
+    if (!selectedCount || inventoryIds.length === 0) return;
+    setActionLoading(true);
+    try {
+      const res = await stockCountService.resolveSerialsBulk(selectedCount.id, { inventory_ids: inventoryIds, action });
+      toast(res.message || 'บันทึกแล้ว', 'success');
+      await refreshDetail(selectedCount.id);
+    } catch (err) {
+      const msg = err instanceof AxiosError ? err.response?.data?.message : 'เกิดข้อผิดพลาด';
+      toast(msg || 'บันทึกไม่สำเร็จ', 'error');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleResolveScan = async (scanId: number, action: 'IMPORT' | 'IGNORE', productId?: number, locationId?: number) => {
     if (!selectedCount) return;
     // Optimistic update — show selected value + product immediately
@@ -779,26 +794,20 @@ function StockCountsContent() {
           {createForm.type === 'CYCLE' && (
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">เลือกหมวดหมู่</label>
-              <div className="max-h-32 overflow-y-auto rounded-lg border border-gray-200 p-2 space-y-1">
-                {categories.map(c => (
-                  <label key={c.id} className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={createForm.filter_category_ids?.includes(c.id) ?? false}
-                      onChange={(e) => {
-                        setCreateForm(f => ({
-                          ...f,
-                          filter_category_ids: e.target.checked
-                            ? [...(f.filter_category_ids || []), c.id]
-                            : (f.filter_category_ids || []).filter(x => x !== c.id),
-                        }));
-                      }}
-                      className="accent-blue-600"
-                    />
-                    {c.name}
-                  </label>
-                ))}
-              </div>
+              <SearchableCheckboxList
+                items={categories}
+                getSearchText={(c) => c.name}
+                renderLabel={(c) => c.name}
+                isChecked={(c) => createForm.filter_category_ids?.includes(c.id) ?? false}
+                onToggle={(c, checked) => setCreateForm(f => ({
+                  ...f,
+                  filter_category_ids: checked
+                    ? [...(f.filter_category_ids || []), c.id]
+                    : (f.filter_category_ids || []).filter(x => x !== c.id),
+                }))}
+                placeholder="ค้นหาหมวดหมู่..."
+                maxHeightClass="max-h-32"
+              />
             </div>
           )}
 
@@ -806,26 +815,20 @@ function StockCountsContent() {
           {createForm.type === 'CYCLE' && (
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">เลือกตำแหน่งคลัง</label>
-              <div className="max-h-32 overflow-y-auto rounded-lg border border-gray-200 p-2 space-y-1">
-                {locations.map(l => (
-                  <label key={l.id} className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={createForm.filter_location_ids?.includes(l.id) ?? false}
-                      onChange={(e) => {
-                        setCreateForm(f => ({
-                          ...f,
-                          filter_location_ids: e.target.checked
-                            ? [...(f.filter_location_ids || []), l.id]
-                            : (f.filter_location_ids || []).filter(x => x !== l.id),
-                        }));
-                      }}
-                      className="accent-blue-600"
-                    />
-                    {l.name} ({l.code})
-                  </label>
-                ))}
-              </div>
+              <SearchableCheckboxList
+                items={locations}
+                getSearchText={(l) => `${l.name} ${l.code}`}
+                renderLabel={(l) => `${l.name} (${l.code})`}
+                isChecked={(l) => createForm.filter_location_ids?.includes(l.id) ?? false}
+                onToggle={(l, checked) => setCreateForm(f => ({
+                  ...f,
+                  filter_location_ids: checked
+                    ? [...(f.filter_location_ids || []), l.id]
+                    : (f.filter_location_ids || []).filter(x => x !== l.id),
+                }))}
+                placeholder="ค้นหาตำแหน่งคลัง..."
+                maxHeightClass="max-h-32"
+              />
             </div>
           )}
 
@@ -833,27 +836,25 @@ function StockCountsContent() {
           {createForm.type === 'SPOT' && (
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">เลือกสินค้า</label>
-              <div className="max-h-40 overflow-y-auto rounded-lg border border-gray-200 p-2 space-y-1">
-                {products.map(p => (
-                  <label key={p.id} className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={createForm.filter_product_ids?.includes(p.id) ?? false}
-                      onChange={(e) => {
-                        setCreateForm(f => ({
-                          ...f,
-                          filter_product_ids: e.target.checked
-                            ? [...(f.filter_product_ids || []), p.id]
-                            : (f.filter_product_ids || []).filter(x => x !== p.id),
-                        }));
-                      }}
-                      className="accent-blue-600"
-                    />
+              <SearchableCheckboxList
+                items={products}
+                getSearchText={(p) => `${p.product_code} ${p.name}`}
+                renderLabel={(p) => (
+                  <>
                     <span className="font-mono text-xs text-gray-500">{p.product_code}</span>
                     {p.name}
-                  </label>
-                ))}
-              </div>
+                  </>
+                )}
+                isChecked={(p) => createForm.filter_product_ids?.includes(p.id) ?? false}
+                onToggle={(p, checked) => setCreateForm(f => ({
+                  ...f,
+                  filter_product_ids: checked
+                    ? [...(f.filter_product_ids || []), p.id]
+                    : (f.filter_product_ids || []).filter(x => x !== p.id),
+                }))}
+                placeholder="ค้นหาสินค้า..."
+                maxHeightClass="max-h-40"
+              />
             </div>
           )}
 
@@ -909,6 +910,7 @@ function StockCountsContent() {
             onCopyPdaUrl={() => copyPdaUrl(selectedCount.id)}
             onPrintReport={() => handlePrintReport(selectedCount.id)}
             onResolveSerial={handleResolveSerial}
+            onResolveSerialBulk={handleResolveSerialBulk}
             onResolveScan={handleResolveScan}
             onResolveScanBulk={handleResolveScanBulk}
             pdaTokens={pdaTokens}
@@ -1095,6 +1097,57 @@ function ProductCombobox({
 }
 
 /* ═══════════════════════════════════════════════════════════════════
+   Searchable Checkbox List (filterable multi-select for create form)
+   ═══════════════════════════════════════════════════════════════════ */
+
+function SearchableCheckboxList<T extends { id: number }>({
+  items, getSearchText, renderLabel, isChecked, onToggle, placeholder = 'ค้นหา...', maxHeightClass = 'max-h-40',
+}: {
+  items: T[];
+  getSearchText: (item: T) => string;
+  renderLabel: (item: T) => React.ReactNode;
+  isChecked: (item: T) => boolean;
+  onToggle: (item: T, checked: boolean) => void;
+  placeholder?: string;
+  maxHeightClass?: string;
+}) {
+  const [q, setQ] = useState('');
+  const query = q.trim().toLowerCase();
+  const filtered = query ? items.filter(it => getSearchText(it).toLowerCase().includes(query)) : items;
+
+  return (
+    <div className="rounded-lg border border-gray-200">
+      <div className="relative border-b border-gray-100 p-1.5">
+        <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+        <input
+          value={q}
+          onChange={e => setQ(e.target.value)}
+          placeholder={placeholder}
+          className="w-full rounded border border-gray-200 py-1 pl-8 pr-2 text-sm focus:border-blue-500 focus:outline-none"
+        />
+      </div>
+      <div className={`${maxHeightClass} overflow-y-auto p-2 space-y-1`}>
+        {filtered.length === 0 ? (
+          <div className="px-1 py-2 text-xs text-gray-400">ไม่พบรายการ</div>
+        ) : (
+          filtered.map(it => (
+            <label key={it.id} className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={isChecked(it)}
+                onChange={e => onToggle(it, e.target.checked)}
+                className="accent-blue-600"
+              />
+              {renderLabel(it)}
+            </label>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
    Detail View Component
    ═══════════════════════════════════════════════════════════════════ */
 
@@ -1115,6 +1168,7 @@ interface DetailViewProps {
   onCopyPdaUrl: () => void;
   onPrintReport: () => void;
   onResolveSerial: (inventoryId: number, action: 'WRITE_OFF' | 'KEEP') => void;
+  onResolveSerialBulk: (inventoryIds: number[], action: 'WRITE_OFF' | 'KEEP') => void;
   onResolveScan: (scanId: number, action: 'IMPORT' | 'IGNORE', productId?: number, locationId?: number) => void;
   onResolveScanBulk: (scanIds: number[], action: 'IMPORT' | 'IGNORE', productId?: number, locationId?: number) => void;
   pdaTokens: Array<{ id: number; token: string; name: string; is_valid: boolean }>;
@@ -1124,7 +1178,7 @@ interface DetailViewProps {
 function DetailView({
   sc, stats, unexpectedScans, unresolved, missingByProduct, actionLoading, products, locations,
   onStart, onComplete, onCancel, onApprove, onViewScans, onCopyPdaUrl, onPrintReport,
-  onResolveSerial, onResolveScan, onResolveScanBulk, pdaTokens, copied,
+  onResolveSerial, onResolveSerialBulk, onResolveScan, onResolveScanBulk, pdaTokens, copied,
 }: DetailViewProps) {
   const statusInfo = STATUS_MAP[sc.status];
   const isInProgress = sc.status === 'IN_PROGRESS';
@@ -1350,6 +1404,7 @@ function DetailView({
                               resolvedCount={resolvedCount}
                               actionLoading={actionLoading}
                               onResolveSerial={onResolveSerial}
+                              onResolveSerialBulk={onResolveSerialBulk}
                               readOnly={!isInProgress}
                             />
                           </td>
@@ -1677,13 +1732,14 @@ function DetailView({
 
 /* ─── Missing Serials Row (loaded when a product row is expanded) ─── */
 function MissingSerialsRow({
-  scId, productId, resolvedCount, actionLoading, onResolveSerial, readOnly = false,
+  scId, productId, resolvedCount, actionLoading, onResolveSerial, onResolveSerialBulk, readOnly = false,
 }: {
   scId: number;
   productId: number;
   resolvedCount: number;
   actionLoading: boolean;
   onResolveSerial: (inventoryId: number, action: 'WRITE_OFF' | 'KEEP') => void;
+  onResolveSerialBulk: (inventoryIds: number[], action: 'WRITE_OFF' | 'KEEP') => void;
   readOnly?: boolean;
 }) {
   const [serials, setSerials] = useState<Array<{
@@ -1692,10 +1748,12 @@ function MissingSerialsRow({
     serial_resolution?: { resolution: string } | null;
   }>>([]);
   const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setSelected(new Set());
     (async () => {
       try {
         const res = await stockCountService.missingSerials(scId, { product_id: productId });
@@ -1705,6 +1763,28 @@ function MissingSerialsRow({
     })();
     return () => { cancelled = true; };
   }, [scId, productId, resolvedCount]);
+
+  const allSelected = serials.length > 0 && serials.every(s => selected.has(s.id));
+  const toggleSelectAll = () => {
+    setSelected(allSelected ? new Set() : new Set(serials.map(s => s.id)));
+  };
+  const toggleSelectOne = (id: number) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+  const applyBulk = (action: 'WRITE_OFF' | 'KEEP') => {
+    const ids = Array.from(selected);
+    if (ids.length === 0) return;
+    setSerials(prev => prev.map(item =>
+      selected.has(item.id) ? { ...item, serial_resolution: { resolution: action } } : item
+    ));
+    onResolveSerialBulk(ids, action);
+    setSelected(new Set());
+  };
 
   if (loading) {
     return (
@@ -1721,12 +1801,53 @@ function MissingSerialsRow({
 
   return (
     <div className="bg-red-50/30 border-t border-red-100">
+      {/* ─── Mass Update bar for missing serials ─── */}
+      {!readOnly && (
+        <div className="flex flex-wrap items-center gap-2 border-b border-red-100 bg-white px-6 py-2 text-xs">
+          <label className="flex items-center gap-1.5 font-medium text-gray-600">
+            <input
+              type="checkbox"
+              checked={allSelected}
+              onChange={toggleSelectAll}
+              className="h-4 w-4 accent-blue-600"
+            />
+            เลือกทั้งหมด ({serials.length})
+          </label>
+          <span className="text-gray-500">เลือกแล้ว {selected.size} รายการ</span>
+          <button
+            type="button"
+            onClick={() => applyBulk('WRITE_OFF')}
+            disabled={actionLoading || selected.size === 0}
+            className="rounded bg-red-500 px-2.5 py-1 font-medium text-white hover:bg-red-600 disabled:opacity-50"
+          >
+            ตัดสต๊อกที่เลือก
+          </button>
+          <button
+            type="button"
+            onClick={() => applyBulk('KEEP')}
+            disabled={actionLoading || selected.size === 0}
+            className="rounded bg-gray-200 px-2.5 py-1 font-medium text-gray-700 hover:bg-gray-300 disabled:opacity-50"
+          >
+            คงไว้ที่เลือก
+          </button>
+        </div>
+      )}
+
       {serials.map((s) => {
         const currentAction = (s.serial_resolution?.resolution ?? '') as string;
 
         return (
           <div key={s.id} className="flex items-center justify-between px-6 py-2 border-b border-red-50 last:border-b-0">
             <div className="flex items-center gap-2">
+              {!readOnly && (
+                <input
+                  type="checkbox"
+                  checked={selected.has(s.id)}
+                  onChange={() => toggleSelectOne(s.id)}
+                  className="h-4 w-4 accent-blue-600"
+                  aria-label={`เลือก ${s.serial_number}`}
+                />
+              )}
               <span className="text-gray-300">└</span>
               <span className="font-mono text-xs">{s.serial_number}</span>
               <Badge variant="gray">{s.status}</Badge>
