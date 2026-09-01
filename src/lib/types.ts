@@ -223,7 +223,7 @@ export interface InventorySummary {
   product_id: number;
   product_code: string;
   product_name: string;
-  category_name: string;
+  category_name: string | null;
   stock_min: number;
   stock_max: number;
   in_stock_count: number;

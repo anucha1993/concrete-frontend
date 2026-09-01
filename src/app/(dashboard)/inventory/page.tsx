@@ -73,6 +73,7 @@ function StockCardsView() {
   const [data, setData] = useState<InventorySummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [serialMatchIds, setSerialMatchIds] = useState<Set<number> | null>(null);
   const [customOrder, setCustomOrder] = useState<number[]>([]);
 
   // Drag state
@@ -108,6 +109,22 @@ function StockCardsView() {
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Serial-number lookup: let the search box also match a scanned SN, not just product name/code
+  useEffect(() => {
+    const term = search.trim();
+    if (term.length < 3) { setSerialMatchIds(null); return; }
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      try {
+        const res = await inventoryService.list({ search: term, per_page: 50 });
+        if (!cancelled) setSerialMatchIds(new Set(res.data.map(i => i.product_id)));
+      } catch {
+        if (!cancelled) setSerialMatchIds(null);
+      }
+    }, 350);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [search]);
 
   const fetchSerials = useCallback(async (productId: number, page: number, status?: string) => {
     setSerialLoading(true);
@@ -156,9 +173,10 @@ function StockCardsView() {
 
   const filtered = search
     ? ordered.filter(d =>
-        d.product_code.toLowerCase().includes(search.toLowerCase()) ||
-        d.product_name.toLowerCase().includes(search.toLowerCase()) ||
-        d.category_name.toLowerCase().includes(search.toLowerCase())
+        (d.product_code ?? '').toLowerCase().includes(search.toLowerCase()) ||
+        (d.product_name ?? '').toLowerCase().includes(search.toLowerCase()) ||
+        (d.category_name ?? '').toLowerCase().includes(search.toLowerCase()) ||
+        (serialMatchIds?.has(d.product_id) ?? false)
       )
     : ordered;
 
@@ -395,6 +413,7 @@ function SummaryView() {
   const [data, setData] = useState<InventorySummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [serialMatchIds, setSerialMatchIds] = useState<Set<number> | null>(null);
 
   // Drill-down: selected product → show serials
   const [selectedProduct, setSelectedProduct] = useState<InventorySummary | null>(null);
@@ -417,6 +436,22 @@ function SummaryView() {
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Serial-number lookup: let the search box also match a scanned SN, not just product name/code
+  useEffect(() => {
+    const term = search.trim();
+    if (term.length < 3) { setSerialMatchIds(null); return; }
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      try {
+        const res = await inventoryService.list({ search: term, per_page: 50 });
+        if (!cancelled) setSerialMatchIds(new Set(res.data.map(i => i.product_id)));
+      } catch {
+        if (!cancelled) setSerialMatchIds(null);
+      }
+    }, 350);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [search]);
 
   // Fetch serials for selected product
   const fetchSerials = useCallback(async (productId: number, page: number, status?: string) => {
@@ -455,9 +490,10 @@ function SummaryView() {
 
   const filtered = search
     ? data.filter(d =>
-        d.product_code.toLowerCase().includes(search.toLowerCase()) ||
-        d.product_name.toLowerCase().includes(search.toLowerCase()) ||
-        d.category_name.toLowerCase().includes(search.toLowerCase())
+        (d.product_code ?? '').toLowerCase().includes(search.toLowerCase()) ||
+        (d.product_name ?? '').toLowerCase().includes(search.toLowerCase()) ||
+        (d.category_name ?? '').toLowerCase().includes(search.toLowerCase()) ||
+        (serialMatchIds?.has(d.product_id) ?? false)
       )
     : data;
 
