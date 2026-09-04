@@ -305,6 +305,7 @@ function POSerialView({ poId, canManage, onBack, onPrinted }: {
   const [customHeight, setCustomHeight] = useState(30);
   const effectivePaperSize = paperSize === 'custom' ? `${customWidth}x${customHeight}` : paperSize;
   const [labelTemplate, setLabelTemplate] = useState<LabelTemplateChoice>('');
+  const [pairMode, setPairMode] = useState(false);
   const [printing, setPrinting] = useState(false);
   const [printingAll, setPrintingAll] = useState(false);
   const [previewItems, setPreviewItems] = useState<Inventory[]>([]);
@@ -591,6 +592,14 @@ function POSerialView({ poId, canManage, onBack, onPrinted }: {
               )}
             </div>
           </div>
+          <div className="w-full sm:w-auto">
+            <label className="mb-1 block text-xs text-gray-500">&nbsp;</label>
+            <label className="flex h-[38px] items-center gap-2 text-sm text-gray-700">
+              <input type="checkbox" checked={pairMode} onChange={e => setPairMode(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-blue-600" />
+              ปริ้นดวงคู่ (2 serial ต่อแผ่น)
+            </label>
+          </div>
           <div className="flex w-full sm:w-auto sm:ml-auto gap-2">
             {canManage && canPrint && unprintedCount > 0 && (
               <button onClick={openPreviewAll}
@@ -632,6 +641,7 @@ function POSerialView({ poId, canManage, onBack, onPrinted }: {
           items={previewItems}
           paperSize={effectivePaperSize}
           customTemplateData={selectedCustomTemplate}
+          pairMode={pairMode}
           printing={previewMode === 'all' ? printingAll : printing}
           onConfirm={handleConfirmPrint}
           onClose={() => setShowPreview(false)}
@@ -644,10 +654,11 @@ function POSerialView({ poId, canManage, onBack, onPrinted }: {
 }
 
 /* ── Print Preview Modal ── */
-function PrintPreviewModal({ items, paperSize, customTemplateData, printing, onConfirm, onClose, poOrderNumber, isAdmin }: {
+function PrintPreviewModal({ items, paperSize, customTemplateData, pairMode, printing, onConfirm, onClose, poOrderNumber, isAdmin }: {
   items: Inventory[];
   paperSize: string;
   customTemplateData?: CustomTemplate;
+  pairMode: boolean;
   printing: boolean;
   onConfirm: (reprintReason?: string) => void;
   onClose: () => void;
@@ -877,11 +888,26 @@ function PrintPreviewModal({ items, paperSize, customTemplateData, printing, onC
     const info = getTemplateInfo();
     if (!info) return;
     const { w, h, firstPage } = info;
+    const pageW = pairMode ? w * 2 : w;
 
-    // Render each label to HTML
-    const labelsHtml = items.map(inv =>
-      `<div class="label">${buildLabelHtml(inv, firstPage)}</div>`
-    ).join('');
+    // Render each label to HTML — in pairMode, group 2 serials side-by-side per physical sheet
+    let labelsHtml: string;
+    if (pairMode) {
+      let sheets = '';
+      for (let i = 0; i < items.length; i += 2) {
+        const left = items[i];
+        const right = items[i + 1];
+        sheets += `<div class="sheet">
+          <div class="label">${buildLabelHtml(left, firstPage)}</div>
+          <div class="label">${right ? buildLabelHtml(right, firstPage) : ''}</div>
+        </div>`;
+      }
+      labelsHtml = sheets;
+    } else {
+      labelsHtml = items.map(inv =>
+        `<div class="sheet"><div class="label">${buildLabelHtml(inv, firstPage)}</div></div>`
+      ).join('');
+    }
 
     const htmlContent = `<!DOCTYPE html>
 <html>
@@ -889,19 +915,24 @@ function PrintPreviewModal({ items, paperSize, customTemplateData, printing, onC
   <title>Labels - ${escapeHtml(poOrderNumber)}</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap');
-    @page { size: ${w}mm ${h}mm; margin: 0; }
+    @page { size: ${pageW}mm ${h}mm; margin: 0; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Sarabun', sans-serif; }
+    .sheet {
+      display: flex;
+      width: ${pageW}mm; height: ${h}mm;
+      page-break-after: always;
+    }
+    .sheet:last-child { page-break-after: auto; }
     .label {
       position: relative;
       width: ${w}mm; height: ${h}mm;
-      page-break-after: always;
       overflow: hidden;
     }
-    .label:last-child { page-break-after: auto; }
     @media screen {
       body { background: #f3f4f6; padding: 20px; display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
-      .label { background: white; border: 1px solid #d1d5db; border-radius: 4px; }
+      .sheet { background: white; border: 1px solid #d1d5db; border-radius: 4px; }
+      .label + .label { border-left: 1px dashed #d1d5db; }
     }
   </style>
 </head>
@@ -985,6 +1016,7 @@ function PrintPreviewModal({ items, paperSize, customTemplateData, printing, onC
             <h2 className="text-base sm:text-lg font-bold text-gray-800">ตัวอย่าง Label ก่อนปริ้น</h2>
             <p className="text-xs sm:text-sm text-gray-500 break-words">
               {items.length} รายการ | {templateLabel} | {paperLabel} | {poOrderNumber}
+              {pairMode && ` | ดวงคู่ (${Math.ceil(items.length / 2)} แผ่น)`}
             </p>
           </div>
           <button onClick={onClose} className="ml-2 shrink-0 rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
@@ -1034,26 +1066,47 @@ function PrintPreviewModal({ items, paperSize, customTemplateData, printing, onC
             const scaleFactor = Math.min(250 / (w * 3.78), 200 / (h * 3.78), 1);
             const displayW = w * 3.78 * scaleFactor;
             const displayH = h * 3.78 * scaleFactor;
+
+            const renderLabelBox = (inv: Inventory) => (
+              <div key={inv.id} className="relative" style={{ width: displayW, height: displayH }}>
+                {inv.label_print_count > 0 && (
+                  <span className="absolute -top-2 -right-2 z-10 rounded bg-orange-200 px-1.5 py-0.5 text-[8px] font-semibold text-orange-700">ปริ้นซ้ำ</span>
+                )}
+                <div
+                  className="origin-top-left bg-white"
+                  style={{
+                    width: `${w}mm`,
+                    height: `${h}mm`,
+                    position: 'relative',
+                    overflow: 'hidden',
+                    transform: `scale(${scaleFactor})`,
+                    transformOrigin: 'top left',
+                    fontFamily: "'Sarabun', sans-serif",
+                  }}
+                  dangerouslySetInnerHTML={{ __html: buildLabelHtml(inv, firstPage) }}
+                />
+              </div>
+            );
+
+            if (pairMode) {
+              const pairs: Inventory[][] = [];
+              for (let i = 0; i < items.length; i += 2) pairs.push([items[i], items[i + 1]].filter(Boolean));
+              return (
+                <div className="flex flex-wrap gap-4 justify-center" ref={previewContainerRef}>
+                  {pairs.map((pair, idx) => (
+                    <div key={idx} className="flex divide-x divide-dashed divide-gray-300 rounded border border-gray-300 bg-white shadow-sm">
+                      {pair.map(renderLabelBox)}
+                    </div>
+                  ))}
+                </div>
+              );
+            }
+
             return (
               <div className="flex flex-wrap gap-4 justify-center" ref={previewContainerRef}>
                 {items.map(inv => (
-                  <div key={inv.id} className="relative" style={{ width: displayW, height: displayH }}>
-                    {inv.label_print_count > 0 && (
-                      <span className="absolute -top-2 -right-2 z-10 rounded bg-orange-200 px-1.5 py-0.5 text-[8px] font-semibold text-orange-700">ปริ้นซ้ำ</span>
-                    )}
-                    <div
-                      className="origin-top-left border border-gray-300 bg-white shadow-sm rounded"
-                      style={{
-                        width: `${w}mm`,
-                        height: `${h}mm`,
-                        position: 'relative',
-                        overflow: 'hidden',
-                        transform: `scale(${scaleFactor})`,
-                        transformOrigin: 'top left',
-                        fontFamily: "'Sarabun', sans-serif",
-                      }}
-                      dangerouslySetInnerHTML={{ __html: buildLabelHtml(inv, firstPage) }}
-                    />
+                  <div key={inv.id} className="rounded border border-gray-300 bg-white shadow-sm">
+                    {renderLabelBox(inv)}
                   </div>
                 ))}
               </div>
