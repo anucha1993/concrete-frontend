@@ -920,12 +920,14 @@ function PrintPreviewModal({ items, paperSize, customTemplateData, pairMode, pri
     body { font-family: 'Sarabun', sans-serif; }
     .sheet {
       display: flex;
+      flex-wrap: nowrap;
       width: ${pageW}mm; height: ${h}mm;
       page-break-after: always;
     }
     .sheet:last-child { page-break-after: auto; }
     .label {
       position: relative;
+      flex: 0 0 ${w}mm;
       width: ${w}mm; height: ${h}mm;
       overflow: hidden;
     }
