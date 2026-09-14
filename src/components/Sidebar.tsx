@@ -32,7 +32,7 @@ interface NavItem {
   label: string;
   href: string;
   icon: React.ReactNode;
-  permission?: string;
+  permission?: string | string[];
 }
 
 const navItems: NavItem[] = [
@@ -46,7 +46,7 @@ const navItems: NavItem[] = [
   { label: 'ออกแบบ Label', href: '/label-templates', icon: <Palette size={20} />, permission: 'manage_production' },
   { label: 'คำขอปริ้นซ้ำ', href: '/reprint-requests', icon: <RotateCw size={20} />, permission: 'view_production' },
   { label: 'ตรวจนับสต๊อก', href: '/stock-counts', icon: <ClipboardCheck size={20} />, permission: 'view_operations' },
-  { label: 'ตัดสต๊อก', href: '/stock-deductions', icon: <TrendingDown size={20} />, permission: 'view_operations' },
+  { label: 'ตัดสต๊อก', href: '/stock-deductions', icon: <TrendingDown size={20} />, permission: ['view_operations', 'view_stock_deductions'] },
   { label: 'เคลมสินค้า', href: '/claims', icon: <FileWarning size={20} />, permission: 'view_operations' },
   { label: 'รายงาน', href: '/reports', icon: <BarChart3 size={20} />, permission: 'view_reports' },
   { label: 'หมวดหมู่', href: '/categories', icon: <FolderTree size={20} />, permission: 'view_products' },
@@ -57,11 +57,11 @@ const navItems: NavItem[] = [
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const { user, logout, hasPermission } = useAuth();
+  const { user, logout, hasPermission, hasAnyPermission } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const filteredItems = navItems.filter(
-    (item) => !item.permission || hasPermission(item.permission)
+    (item) => !item.permission || (Array.isArray(item.permission) ? hasAnyPermission(item.permission) : hasPermission(item.permission))
   );
 
   const handleLogout = async () => {

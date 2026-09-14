@@ -64,15 +64,16 @@ function getStatusBadge(status: string) {
 
 export default function StockDeductionsPage() {
   return (
-    <AuthGuard permission="view_operations">
+    <AuthGuard permission={['view_operations', 'view_stock_deductions']}>
       <StockDeductionsContent />
     </AuthGuard>
   );
 }
 
 function StockDeductionsContent() {
-  const { hasPermission } = useAuth();
-  const canManage = hasPermission('manage_operations');
+  const { hasAnyPermission } = useAuth();
+  const canManage = hasAnyPermission(['manage_operations', 'manage_stock_deductions']);
+  const canApprove = hasAnyPermission(['manage_operations', 'approve_stock_deductions']);
 
   const [view, setView] = useState<'list' | 'create' | 'detail'>('list');
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -86,7 +87,7 @@ function StockDeductionsContent() {
       <PageHeader title="ตัดสต๊อก" description="สร้างใบตัดสต๊อก เลือกสินค้า+จำนวน แล้วส่งให้ PDA สแกน barcode ตัดจริง" />
       {view === 'list' && <ListView canManage={canManage} onView={openDetail} onCreate={openCreate} />}
       {view === 'create' && <CreateView canManage={canManage} onBack={backToList} onCreated={(id) => openDetail(id)} />}
-      {view === 'detail' && selectedId && <DetailView id={selectedId} canManage={canManage} onBack={backToList} />}
+      {view === 'detail' && selectedId && <DetailView id={selectedId} canManage={canManage} canApprove={canApprove} onBack={backToList} />}
     </div>
   );
 }
@@ -528,7 +529,7 @@ function CreateView({ canManage, onBack, onCreated }: { canManage: boolean; onBa
 /* ════════════════════════════════════════════════════════════
    DETAIL VIEW — shows lines progress, PDA link, scans
    ════════════════════════════════════════════════════════════ */
-function DetailView({ id, canManage, onBack }: { id: number; canManage: boolean; onBack: () => void }) {
+function DetailView({ id, canManage, canApprove, onBack }: { id: number; canManage: boolean; canApprove: boolean; onBack: () => void }) {
   const [deduction, setDeduction] = useState<StockDeduction | null>(null);
   const [stats, setStats] = useState({ total_planned: 0, total_scanned: 0, lines_count: 0, scans_count: 0 });
   const [loading, setLoading] = useState(true);
@@ -841,7 +842,7 @@ function DetailView({ id, canManage, onBack }: { id: number; canManage: boolean;
                 <Trash2 size={13} /> ลบ
               </button>
             )}
-            {canManage && deduction.status === 'COMPLETED' && (
+            {canManage && deduction.status === 'COMPLETED' && canApprove && (
               <button onClick={() => setConfirmAction('approve')}
                 className="flex items-center gap-1 rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700">
                 <ShieldCheck size={13} /> อนุมัติ

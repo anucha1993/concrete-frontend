@@ -6,11 +6,11 @@ import { useAuth } from '@/contexts/AuthContext';
 
 interface AuthGuardProps {
   children: React.ReactNode;
-  permission?: string;
+  permission?: string | string[];
 }
 
 export default function AuthGuard({ children, permission }: AuthGuardProps) {
-  const { user, loading, hasPermission } = useAuth();
+  const { user, loading, hasPermission, hasAnyPermission } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -29,7 +29,9 @@ export default function AuthGuard({ children, permission }: AuthGuardProps) {
 
   if (!user) return null;
 
-  if (permission && !hasPermission(permission)) {
+  const allowed = !permission || (Array.isArray(permission) ? hasAnyPermission(permission) : hasPermission(permission));
+
+  if (!allowed) {
     return (
       <div className="flex h-[60vh] flex-col items-center justify-center gap-4">
         <div className="text-6xl">🚫</div>
