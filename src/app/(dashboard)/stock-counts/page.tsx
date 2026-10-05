@@ -13,6 +13,9 @@ import { stockCountService } from '@/services/stock-count.service';
 import { categoryService, locationService } from '@/services/master.service';
 import { productService } from '@/services/product.service';
 import { labelService } from '@/services/label.service';
+import { labelTemplateService, type LabelTemplate } from '@/services/label-template.service';
+import LabelPrintPreviewModal from '@/components/labels/LabelPrintPreviewModal';
+import { useAuth } from '@/contexts/AuthContext';
 import type {
   StockCount,
   StockCountScan,
@@ -22,6 +25,7 @@ import type {
   Category,
   Location,
   Product,
+  Inventory,
 } from '@/lib/types';
 import { AxiosError } from 'axios';
 import {
@@ -105,6 +109,11 @@ function StockCountsContent() {
 
   /* ─── Action loading ─── */
   const [actionLoading, setActionLoading] = useState(false);
+
+  /* ─── Reprint labels (sticker lost) ─── */
+  const { hasPermission } = useAuth();
+  const canReprintLabels = hasPermission('manage_operations');
+  const [reprintItems, setReprintItems] = useState<Inventory[] | null>(null);
 
   /* ─── PDA tokens for copy URL ─── */
   const [pdaTokens, setPdaTokens] = useState<Array<{ id: number; token: string; name: string; is_valid: boolean }>>([]);
@@ -915,6 +924,7 @@ function StockCountsContent() {
             onResolveScanBulk={handleResolveScanBulk}
             pdaTokens={pdaTokens}
             copied={copiedId === selectedCount.id}
+            onReprintLabels={canReprintLabels ? setReprintItems : undefined}
           />
         ) : null}
       </Modal>
@@ -989,7 +999,108 @@ function StockCountsContent() {
           </div>
         )}
       </Modal>
+
+      {/* ═══ Reprint Labels Modal ═══ */}
+      {reprintItems && selectedCount && (
+        <ReprintLabelsModal
+          scId={selectedCount.id}
+          scCode={selectedCount.code}
+          items={reprintItems}
+          onClose={() => setReprintItems(null)}
+        />
+      )}
     </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Reprint Labels Modal — reprint stickers that fell off / got lost
+   ═══════════════════════════════════════════════════════════════════ */
+
+function ReprintLabelsModal({ scId, scCode, items, onClose }: {
+  scId: number;
+  scCode: string;
+  items: Inventory[];
+  onClose: () => void;
+}) {
+  const [templates, setTemplates] = useState<LabelTemplate[]>([]);
+  const [templateId, setTemplateId] = useState<number | null>(null);
+  const [pairMode, setPairMode] = useState(false);
+  const [printing, setPrinting] = useState(false);
+
+  useEffect(() => {
+    labelTemplateService.list(true).then(res => {
+      setTemplates(res.data);
+      const def = res.data.find(t => t.is_default) ?? res.data[0];
+      if (def) setTemplateId(def.id);
+    }).catch(() => toast('โหลด Template ไม่สำเร็จ', 'error'));
+  }, []);
+
+  const template = templates.find(t => t.id === templateId);
+  const paperSize = template ? `${Number(template.paper_width)}x${Number(template.paper_height)}` : '50x30';
+
+  const handleConfirm = async (reason?: string) => {
+    if (!template) { toast('กรุณาเลือก Template ก่อนปริ้น', 'error'); return; }
+    setPrinting(true);
+    try {
+      const res = await stockCountService.reprintLabels(scId, {
+        inventory_ids: items.map(i => i.id),
+        paper_size: paperSize,
+        reason: reason?.trim() || undefined,
+      });
+      toast(res.message || 'ปริ้น Label ใหม่สำเร็จ', 'success');
+      onClose();
+    } catch (err) {
+      const msg = err instanceof AxiosError ? err.response?.data?.message : 'เกิดข้อผิดพลาด';
+      toast(msg || 'ปริ้น Label ไม่สำเร็จ', 'error');
+    } finally {
+      setPrinting(false);
+    }
+  };
+
+  return (
+    <LabelPrintPreviewModal
+      items={items}
+      paperSize={paperSize}
+      customTemplateData={template}
+      pairMode={pairMode}
+      printing={printing}
+      onConfirm={handleConfirm}
+      onClose={onClose}
+      canReprint
+      reprintHint={`ระบบจะบันทึกประวัติว่า "สติ๊กเกอร์หลุด/หาย — รอบนับ ${scCode}" — ระบุหมายเหตุเพิ่มเติมได้ (ไม่บังคับ)`}
+      toolbar={
+        <div className="flex flex-wrap items-end gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+          <div>
+            <label className="mb-1 block text-xs text-gray-500">รูปแบบ Label</label>
+            <select
+              value={templateId ?? ''}
+              onChange={(e) => setTemplateId(e.target.value ? Number(e.target.value) : null)}
+              className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            >
+              <option value="" disabled>เลือก Template</option>
+              {templates.map(t => (
+                <option key={t.id} value={t.id}>
+                  {t.name} ({t.paper_width}×{t.paper_height}mm){t.is_default ? ' ⭐' : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+          <label className="flex h-[38px] items-center gap-2 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              checked={pairMode}
+              onChange={(e) => setPairMode(e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300 text-blue-600"
+            />
+            ปริ้นดวงคู่ (2 serial ต่อแผ่น)
+          </label>
+          <p className="w-full text-xs text-gray-500">
+            ติด Label ใหม่แล้วสแกนด้วย PDA อีกครั้ง — serial จะถูกนับและหายจากรายการขาด
+          </p>
+        </div>
+      }
+    />
   );
 }
 
@@ -1173,12 +1284,13 @@ interface DetailViewProps {
   onResolveScanBulk: (scanIds: number[], action: 'IMPORT' | 'IGNORE', productId?: number, locationId?: number) => void;
   pdaTokens: Array<{ id: number; token: string; name: string; is_valid: boolean }>;
   copied: boolean;
+  onReprintLabels?: (items: Inventory[]) => void;
 }
 
 function DetailView({
   sc, stats, unexpectedScans, unresolved, missingByProduct, actionLoading, products, locations,
   onStart, onComplete, onCancel, onApprove, onViewScans, onCopyPdaUrl, onPrintReport,
-  onResolveSerial, onResolveSerialBulk, onResolveScan, onResolveScanBulk, pdaTokens, copied,
+  onResolveSerial, onResolveSerialBulk, onResolveScan, onResolveScanBulk, pdaTokens, copied, onReprintLabels,
 }: DetailViewProps) {
   const statusInfo = STATUS_MAP[sc.status];
   const isInProgress = sc.status === 'IN_PROGRESS';
@@ -1405,6 +1517,7 @@ function DetailView({
                               actionLoading={actionLoading}
                               onResolveSerial={onResolveSerial}
                               onResolveSerialBulk={onResolveSerialBulk}
+                              onReprintLabels={onReprintLabels}
                               readOnly={!isInProgress}
                             />
                           </td>
@@ -1732,7 +1845,7 @@ function DetailView({
 
 /* ─── Missing Serials Row (loaded when a product row is expanded) ─── */
 function MissingSerialsRow({
-  scId, productId, resolvedCount, actionLoading, onResolveSerial, onResolveSerialBulk, readOnly = false,
+  scId, productId, resolvedCount, actionLoading, onResolveSerial, onResolveSerialBulk, onReprintLabels, readOnly = false,
 }: {
   scId: number;
   productId: number;
@@ -1740,13 +1853,14 @@ function MissingSerialsRow({
   actionLoading: boolean;
   onResolveSerial: (inventoryId: number, action: 'WRITE_OFF' | 'KEEP') => void;
   onResolveSerialBulk: (inventoryIds: number[], action: 'WRITE_OFF' | 'KEEP') => void;
+  onReprintLabels?: (items: Inventory[]) => void;
   readOnly?: boolean;
 }) {
-  const [serials, setSerials] = useState<Array<{
-    id: number; serial_number: string; status: string;
-    product?: { name: string; product_code: string };
+  const [serials, setSerials] = useState<Array<Inventory & {
     serial_resolution?: { resolution: string } | null;
   }>>([]);
+  // Checkboxes are needed for resolving (IN_PROGRESS) or for reprinting labels
+  const selectable = !readOnly || !!onReprintLabels;
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Set<number>>(new Set());
 
@@ -1803,7 +1917,7 @@ function MissingSerialsRow({
   return (
     <div className="bg-red-50/30 border-t border-red-100">
       {/* ─── Mass Update bar for missing serials ─── */}
-      {!readOnly && (
+      {selectable && (
         <div className="flex flex-wrap items-center gap-2 border-b border-red-100 bg-white px-6 py-2 text-xs">
           <label className="flex items-center gap-1.5 font-medium text-gray-600">
             <input
@@ -1815,22 +1929,37 @@ function MissingSerialsRow({
             เลือกทั้งหมด ({serials.length})
           </label>
           <span className="text-gray-500">เลือกแล้ว {selected.size} รายการ</span>
-          <button
-            type="button"
-            onClick={() => applyBulk('WRITE_OFF')}
-            disabled={actionLoading || selected.size === 0}
-            className="rounded bg-red-500 px-2.5 py-1 font-medium text-white hover:bg-red-600 disabled:opacity-50"
-          >
-            ตัดสต๊อกที่เลือก
-          </button>
-          <button
-            type="button"
-            onClick={() => applyBulk('KEEP')}
-            disabled={actionLoading || selected.size === 0}
-            className="rounded bg-gray-200 px-2.5 py-1 font-medium text-gray-700 hover:bg-gray-300 disabled:opacity-50"
-          >
-            คงไว้ที่เลือก
-          </button>
+          {!readOnly && (
+            <>
+              <button
+                type="button"
+                onClick={() => applyBulk('WRITE_OFF')}
+                disabled={actionLoading || selected.size === 0}
+                className="rounded bg-red-500 px-2.5 py-1 font-medium text-white hover:bg-red-600 disabled:opacity-50"
+              >
+                ตัดสต๊อกที่เลือก
+              </button>
+              <button
+                type="button"
+                onClick={() => applyBulk('KEEP')}
+                disabled={actionLoading || selected.size === 0}
+                className="rounded bg-gray-200 px-2.5 py-1 font-medium text-gray-700 hover:bg-gray-300 disabled:opacity-50"
+              >
+                คงไว้ที่เลือก
+              </button>
+            </>
+          )}
+          {onReprintLabels && (
+            <button
+              type="button"
+              onClick={() => onReprintLabels(serials.filter(s => selected.has(s.id)))}
+              disabled={selected.size === 0}
+              className="flex items-center gap-1 rounded bg-blue-600 px-2.5 py-1 font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              title="ปริ้น Label ใหม่สำหรับสินค้าที่สติ๊กเกอร์หลุด/หาย"
+            >
+              <Printer size={12} /> ปริ้น Label ใหม่ ({selected.size})
+            </button>
+          )}
         </div>
       )}
 
@@ -1840,7 +1969,7 @@ function MissingSerialsRow({
         return (
           <div key={s.id} className="flex items-center justify-between px-6 py-2 border-b border-red-50 last:border-b-0">
             <div className="flex items-center gap-2">
-              {!readOnly && (
+              {selectable && (
                 <input
                   type="checkbox"
                   checked={selected.has(s.id)}
@@ -1852,6 +1981,16 @@ function MissingSerialsRow({
               <span className="text-gray-300">└</span>
               <span className="font-mono text-xs">{s.serial_number}</span>
               <Badge variant="gray">{s.status}</Badge>
+              {onReprintLabels && (
+                <button
+                  type="button"
+                  onClick={() => onReprintLabels([s])}
+                  className="rounded p-1 text-gray-400 hover:bg-blue-50 hover:text-blue-600"
+                  title="ปริ้น Label ใหม่ (สติ๊กเกอร์หลุด/หาย)"
+                >
+                  <Printer size={13} />
+                </button>
+              )}
             </div>
             {readOnly ? (
               currentAction ? (

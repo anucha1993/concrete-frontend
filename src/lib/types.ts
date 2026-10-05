@@ -193,6 +193,7 @@ export interface Inventory {
   location_id: number | null;
   location?: Location;
   production_order_id: number | null;
+  production_order?: { id: number; order_number: string } | null;
   status: 'PENDING' | 'IN_STOCK' | 'SOLD' | 'DAMAGED' | 'SCRAPPED';
   condition: 'GOOD' | 'DAMAGED';
   note: string | null;

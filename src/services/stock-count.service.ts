@@ -9,6 +9,7 @@ import type {
   StockCountResolveSerialBulkPayload,
   StockCountResolveScanPayload,
   StockCountResolveScanBulkPayload,
+  Inventory,
   ApiResponse,
 } from '@/lib/types';
 
@@ -107,6 +108,15 @@ export const stockCountService = {
   resolveScansBulk: async (id: number, payload: StockCountResolveScanBulkPayload) => {
     const { data } = await api.post<ApiResponse<null>>(
       `/stock-counts/${id}/resolve-scans-bulk`,
+      payload
+    );
+    return data;
+  },
+
+  /* ── Reprint labels (sticker lost during count) ── */
+  reprintLabels: async (id: number, payload: { inventory_ids: number[]; paper_size?: string; reason?: string }) => {
+    const { data } = await api.post<ApiResponse<Inventory[]>>(
+      `/stock-counts/${id}/reprint-labels`,
       payload
     );
     return data;

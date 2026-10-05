@@ -48,9 +48,6 @@ function LoginForm() {
         {/* Form Card */}
         <div className="rounded-2xl bg-white p-8 shadow-xl">
           <h2 className="mb-6 text-lg font-semibold text-gray-800">เข้าสู่ระบบ</h2>
-          <p>User : admin@stockconcrete.com</p>
-          <p>password : password</p>
-          <br />
 
           {error && (
             <div className="mb-4 rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-600">
@@ -65,7 +62,7 @@ function LoginForm() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@stockconcrete.com"
+                placeholder="กรอกอีเมล"
                 required
                 className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
               />
