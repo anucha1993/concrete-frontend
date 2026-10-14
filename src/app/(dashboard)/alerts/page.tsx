@@ -8,6 +8,7 @@ import { toast } from '@/components/ui/Toast';
 import { inventoryService } from '@/services/inventory.service';
 import type { InventoryAlert, Inventory } from '@/lib/types';
 import { AlertTriangle, Clock, PackageX, RefreshCw } from 'lucide-react';
+import { useSerialMask } from '@/hooks/useSerialMask';
 
 export default function AlertsPage() {
   return (
@@ -170,6 +171,7 @@ function AlertSection({ title, variant, icon, children }: {
 function InventoryAlertTable({ items, dateField, dateLabel }: {
   items: Inventory[]; dateField: 'last_movement_at' | 'received_at'; dateLabel: string;
 }) {
+  const maskSerial = useSerialMask();
   const now = useMemo(() => new Date(), []);
   return (
     <table className="w-full text-sm">
@@ -189,7 +191,7 @@ function InventoryAlertTable({ items, dateField, dateLabel }: {
           const daysDiff = dateVal ? Math.floor((now.getTime() - new Date(dateVal).getTime()) / 86400000) : null;
           return (
             <tr key={item.id} className="border-t">
-              <td className="px-4 py-2 font-mono text-xs">{item.serial_number}</td>
+              <td className="px-4 py-2 font-mono text-xs">{maskSerial(item.serial_number)}</td>
               <td className="px-4 py-2">{item.product?.product_code} - {item.product?.name}</td>
               <td className="px-4 py-2">{item.location?.name || '-'}</td>
               <td className="px-4 py-2 text-center"><Badge variant="warning">{item.status}</Badge></td>

@@ -16,6 +16,7 @@ import { locationService } from '@/services/master.service';
 import type { ProductionOrder, ProductionOrderPayload, ReceivePayload, ProductionSerial, Pack, Location } from '@/lib/types';
 import { Plus, Search, Eye, Play, CheckCircle, XCircle, PackageCheck, ClipboardList } from 'lucide-react';
 import { AxiosError } from 'axios';
+import { useSerialMask } from '@/hooks/useSerialMask';
 
 const STATUS_MAP: Record<string, { label: string; variant: 'gray' | 'info' | 'warning' | 'success' | 'danger' }> = {
   DRAFT:       { label: 'แบบร่าง', variant: 'gray' },
@@ -603,6 +604,7 @@ function ReceiveForm({ order, onSubmit, onCancel, saving }: {
 
 /* ── Serials View ── */
 function SerialsView({ serials }: { serials: ProductionSerial[] }) {
+  const maskSerial = useSerialMask();
   if (serials.length === 0) return <p className="py-8 text-center text-sm text-gray-400">ไม่มี Serial</p>;
 
   return (
@@ -622,7 +624,7 @@ function SerialsView({ serials }: { serials: ProductionSerial[] }) {
           {serials.map((s, i) => (
             <tr key={s.id} className="border-t hover:bg-gray-50">
               <td className="px-3 py-2 text-gray-400">{i + 1}</td>
-              <td className="px-3 py-2 font-mono text-xs">{s.serial_number}</td>
+              <td className="px-3 py-2 font-mono text-xs">{maskSerial(s.serial_number)}</td>
               <td className="px-3 py-2">{s.product.name}</td>
               <td className="px-3 py-2">{s.location?.name || '-'}</td>
               <td className="px-3 py-2 text-center">

@@ -32,6 +32,7 @@ import {
   ScanBarcode,
   ExternalLink,
 } from 'lucide-react';
+import { useSerialMask } from '@/hooks/useSerialMask';
 
 const TYPE_OPTIONS: { value: ClaimType; label: string; color: 'info' | 'warning' | 'danger' | 'gray' | 'success' }[] = [
   { value: 'RETURN', label: 'คืนสินค้า', color: 'info' },
@@ -221,6 +222,7 @@ interface ClaimLineDraft {
 }
 
 function CreateView({ canManage, onBack, onCreated }: { canManage: boolean; onBack: () => void; onCreated: (id: number) => void }) {
+  const maskSerial = useSerialMask();
   const [form, setForm] = useState<Omit<ClaimPayload, 'lines'>>({ type: 'RETURN' });
   const [lines, setLines] = useState<ClaimLineDraft[]>([]);
   const [saving, setSaving] = useState(false);
@@ -392,7 +394,7 @@ function CreateView({ canManage, onBack, onCreated }: { canManage: boolean; onBa
                     <button key={`${item.inventory_id}-${i}`} type="button"
                       onClick={() => addItem(item)}
                       className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-blue-50">
-                      <span className="font-mono text-xs text-blue-600 font-bold">S/N: {item.serial_number}</span>
+                      <span className="font-mono text-xs text-blue-600 font-bold">S/N: {maskSerial(item.serial_number)}</span>
                       <span className="font-mono text-xs text-gray-500">{item.product_code}</span>
                       <span className="flex-1">{item.product_name}</span>
                       <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500">{item.status} / {item.condition}</span>
@@ -422,7 +424,7 @@ function CreateView({ canManage, onBack, onCreated }: { canManage: boolean; onBa
                         <td className="px-3 py-2 text-gray-500">{idx + 1}</td>
                         <td className="px-3 py-2">
                           <div className="font-medium text-gray-800">{line.product_name}</div>
-                          <div className="font-mono text-xs text-blue-600 font-bold">S/N: {line.serial_number}</div>
+                          <div className="font-mono text-xs text-blue-600 font-bold">S/N: {maskSerial(line.serial_number)}</div>
                           <div className="font-mono text-xs text-gray-400">{line.product_code}</div>
                         </td>
                         <td className="px-3 py-2 text-center">
@@ -481,6 +483,7 @@ function CreateView({ canManage, onBack, onCreated }: { canManage: boolean; onBa
    DETAIL VIEW
    ════════════════════════════════════════════════════════════ */
 function DetailView({ id, canManage, onBack }: { id: number; canManage: boolean; onBack: () => void }) {
+  const maskSerial = useSerialMask();
   const [claim, setClaim] = useState<Claim | null>(null);
   const [stats, setStats] = useState({ total_qty: 0, lines_count: 0 });
   const [loading, setLoading] = useState(true);
@@ -875,7 +878,7 @@ function DetailView({ id, canManage, onBack }: { id: number; canManage: boolean;
                     {editSearchResults.map((item, i) => (
                       <button key={`${item.inventory_id}-${i}`} type="button" onClick={() => addEditItem(item)}
                         className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-blue-50">
-                        <span className="font-mono text-xs text-blue-600 font-bold">S/N: {item.serial_number}</span>
+                        <span className="font-mono text-xs text-blue-600 font-bold">S/N: {maskSerial(item.serial_number)}</span>
                         <span className="font-mono text-xs text-gray-500">{item.product_code}</span>
                         <span className="flex-1">{item.product_name}</span>
                         <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500">{item.status} / {item.condition}</span>
@@ -902,7 +905,7 @@ function DetailView({ id, canManage, onBack }: { id: number; canManage: boolean;
                           <td className="px-3 py-2 text-gray-500">{idx + 1}</td>
                           <td className="px-3 py-2">
                             <div className="font-medium text-gray-800">{line.product_name}</div>
-                            <div className="font-mono text-xs text-blue-600 font-bold">S/N: {line.serial_number}</div>
+                            <div className="font-mono text-xs text-blue-600 font-bold">S/N: {maskSerial(line.serial_number)}</div>
                             <div className="font-mono text-xs text-gray-400">{line.product_code}</div>
                           </td>
                           <td className="px-3 py-2 text-center">
@@ -969,7 +972,7 @@ function DetailView({ id, canManage, onBack }: { id: number; canManage: boolean;
                         <td className="px-4 py-2 text-gray-500">{idx + 1}</td>
                         <td className="px-4 py-2">
                           <div className="font-medium text-gray-800">{line.product?.name || '-'}</div>
-                          <div className="font-mono text-xs text-blue-600 font-bold">S/N: {line.serial_number || '-'}</div>
+                          <div className="font-mono text-xs text-blue-600 font-bold">S/N: {maskSerial(line.serial_number) || '-'}</div>
                           <div className="font-mono text-xs text-gray-400">{line.product?.product_code || '-'}</div>
                         </td>
                         <td className="px-4 py-2 text-center">

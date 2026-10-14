@@ -14,6 +14,7 @@ import {
   BarChart3, ArrowRight, ShieldAlert, Timer,
 } from 'lucide-react';
 import Link from 'next/link';
+import { useSerialMask } from '@/hooks/useSerialMask';
 
 /* ─── Types ─── */
 interface StockOverview {
@@ -65,6 +66,7 @@ interface MovementSummary {
 
 /* ─── Main ─── */
 export default function DashboardPage() {
+  const maskSerial = useSerialMask();
   const { user, hasPermission } = useAuth();
   const canViewInventory = hasPermission('view_inventory');
   const canViewReports = hasPermission('view_reports');
@@ -381,7 +383,7 @@ export default function DashboardPage() {
                 <div className="flex flex-wrap gap-1.5">
                   {alerts.no_movement.slice(0, 20).map(inv => (
                     <span key={inv.id} className="inline-block rounded bg-yellow-100 px-2 py-1 text-xs font-mono text-yellow-800">
-                      {inv.serial_number}
+                      {maskSerial(inv.serial_number)}
                     </span>
                   ))}
                   {alerts.no_movement.length > 20 && (
@@ -406,7 +408,7 @@ export default function DashboardPage() {
                 <div className="flex flex-wrap gap-1.5">
                   {alerts.long_storage.slice(0, 20).map(inv => (
                     <span key={inv.id} className="inline-block rounded bg-orange-100 px-2 py-1 text-xs font-mono text-orange-800">
-                      {inv.serial_number}
+                      {maskSerial(inv.serial_number)}
                     </span>
                   ))}
                   {alerts.long_storage.length > 20 && (

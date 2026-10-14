@@ -23,6 +23,7 @@ import {
   Printer,
   RefreshCw,
 } from 'lucide-react';
+import { useSerialMask } from '@/hooks/useSerialMask';
 
 const STATUS_MAP: Record<string, { label: string; variant: 'warning' | 'success' | 'danger' | 'info' }> = {
   PENDING:  { label: 'รอดำเนินการ', variant: 'warning' },
@@ -271,6 +272,7 @@ function ReprintRequestDetail({ data, canManage, onApprove, onReject }: {
   data: LabelReprintRequest; canManage: boolean;
   onApprove: () => void; onReject: () => void;
 }) {
+  const maskSerial = useSerialMask();
   const s = STATUS_MAP[data.status];
 
   return (
@@ -319,7 +321,7 @@ function ReprintRequestDetail({ data, canManage, onApprove, onReject }: {
                 {data.inventories.map((inv, i) => (
                   <tr key={inv.id} className="border-t">
                     <td className="px-3 py-2 text-gray-400">{i + 1}</td>
-                    <td className="px-3 py-2 font-mono text-xs">{inv.serial_number}</td>
+                    <td className="px-3 py-2 font-mono text-xs">{maskSerial(inv.serial_number)}</td>
                     <td className="px-3 py-2">{inv.product?.product_code} - {inv.product?.name}</td>
                   </tr>
                 ))}
@@ -347,6 +349,7 @@ function ReprintRequestDetail({ data, canManage, onApprove, onReject }: {
 type SearchMode = 'po' | 'search';
 
 function CreateReprintRequestForm({ onSuccess, onCancel }: { onSuccess: () => void; onCancel: () => void }) {
+  const maskSerial = useSerialMask();
   const [mode, setMode] = useState<SearchMode>('po');
   const [reason, setReason] = useState('');
   const [saving, setSaving] = useState(false);
@@ -500,7 +503,7 @@ function CreateReprintRequestForm({ onSuccess, onCancel }: { onSuccess: () => vo
                           className="rounded bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-600 hover:bg-blue-100">+ เพิ่ม</button>
                   )}
                 </td>
-                <td className="px-3 py-2 font-mono text-xs">{inv.serial_number}</td>
+                <td className="px-3 py-2 font-mono text-xs">{maskSerial(inv.serial_number)}</td>
                 <td className="px-3 py-2 text-xs">{inv.product?.product_code} - {inv.product?.name}</td>
                 <td className="px-3 py-2 text-center text-xs">{inv.label_print_count} ครั้ง</td>
                 <td className="px-3 py-2 text-center">
@@ -606,7 +609,7 @@ function CreateReprintRequestForm({ onSuccess, onCancel }: { onSuccess: () => vo
           <div className="flex flex-wrap gap-2">
             {Array.from(selectedItems.values()).map(inv => (
               <span key={inv.id} className="flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-mono border border-blue-200">
-                {inv.serial_number}
+                {maskSerial(inv.serial_number)}
                 <button type="button" onClick={() => removeItem(inv.id)} className="ml-1 text-red-400 hover:text-red-600">&times;</button>
               </span>
             ))}

@@ -13,6 +13,7 @@ import { inventoryService } from '@/services/inventory.service';
 import { locationService } from '@/services/master.service';
 import type { Inventory, InventorySummary, Location } from '@/lib/types';
 import { Search, Eye, BarChart3, List, Package, ChevronLeft, ChevronRight, LayoutGrid, AlertTriangle, GripVertical, RotateCcw, Pencil, Save, X } from 'lucide-react';
+import { useSerialMask } from '@/hooks/useSerialMask';
 
 const STATUS_MAP: Record<string, { label: string; variant: 'gray' | 'info' | 'warning' | 'success' | 'danger' }> = {
   PENDING:   { label: 'รอรับเข้าคลัง', variant: 'gray' },
@@ -609,6 +610,7 @@ function ProductSerialList({ product, serials, meta, page, loading, filter, onPa
   onPageChange: (p: number) => void;
   onFilterChange: (f: string) => void;
 }) {
+  const maskSerial = useSerialMask();
   return (
     <div className="space-y-4">
       {/* Summary strip */}
@@ -664,7 +666,7 @@ function ProductSerialList({ product, serials, meta, page, loading, filter, onPa
                 return (
                   <tr key={s.id} className="border-t hover:bg-gray-50">
                     <td className="px-3 py-2 text-gray-400">{(page - 1) * meta.per_page + i + 1}</td>
-                    <td className="px-3 py-2 font-mono text-xs font-medium">{s.serial_number}</td>
+                    <td className="px-3 py-2 font-mono text-xs font-medium">{maskSerial(s.serial_number)}</td>
                     <td className="px-3 py-2 text-sm">{s.location?.name || '-'}</td>
                     <td className="px-3 py-2 text-center"><Badge variant={st.variant}>{st.label}</Badge></td>
                     <td className="px-3 py-2 text-center">
@@ -726,6 +728,7 @@ function StatCard({ label, value, icon }: { label: string; value: number; icon: 
    List View — individual serials
    ══════════════════════════════════════════════════════════════════ */
 function InventoryListView() {
+  const maskSerial = useSerialMask();
   const [items, setItems] = useState<Inventory[]>([]);
   const [meta, setMeta] = useState({ current_page: 1, last_page: 1, per_page: 15, total: 0 });
   const [loading, setLoading] = useState(true);
@@ -772,7 +775,7 @@ function InventoryListView() {
   const columns = [
     {
       key: 'serial_number', label: 'Serial Number',
-      render: (r: Inventory) => <span className="font-mono text-xs font-medium">{r.serial_number}</span>,
+      render: (r: Inventory) => <span className="font-mono text-xs font-medium">{maskSerial(r.serial_number)}</span>,
     },
     {
       key: 'product', label: 'สินค้า',
@@ -870,7 +873,7 @@ function InventoryListView() {
 
       {/* Detail Modal */}
       <Modal open={!!selectedItem} onClose={() => { setSelectedItem(null); setDetailData(null); }}
-        title={`รายละเอียด Serial: ${selectedItem?.serial_number || ''}`} size="lg">
+        title={`รายละเอียด Serial: ${maskSerial(selectedItem?.serial_number)}`} size="lg">
         {detailData ? <InventoryDetail item={detailData} onUpdate={(updated) => {
           setDetailData(updated);
           // refresh list
@@ -886,6 +889,7 @@ function InventoryDetail({ item, onUpdate }: {
   item: Inventory & { movements?: Array<{ id: number; type: string; from_location?: { name: string }; to_location?: { name: string }; creator?: { name: string }; created_at: string; note?: string }> };
   onUpdate?: (updated: Inventory) => void;
 }) {
+  const maskSerial = useSerialMask();
   const { hasPermission } = useAuth();
   const canEdit = hasPermission('manage_inventory');
 
@@ -963,7 +967,7 @@ function InventoryDetail({ item, onUpdate }: {
       {!editing ? (
         /* ── View mode ── */
         <div className="grid gap-3 sm:grid-cols-2 text-sm">
-          <div><span className="text-gray-500">Serial:</span> <span className="font-mono font-medium">{item.serial_number}</span></div>
+          <div><span className="text-gray-500">Serial:</span> <span className="font-mono font-medium">{maskSerial(item.serial_number)}</span></div>
           <div><span className="text-gray-500">สถานะ:</span> <Badge variant={s.variant}>{s.label}</Badge></div>
           <div><span className="text-gray-500">สินค้า:</span> {item.product?.product_code} - {item.product?.name}</div>
           <div><span className="text-gray-500">สภาพ:</span> <Badge variant={c.variant}>{c.label}</Badge></div>
@@ -978,7 +982,7 @@ function InventoryDetail({ item, onUpdate }: {
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-600">Serial</label>
-              <input type="text" value={item.serial_number} disabled className="w-full rounded-lg border bg-gray-100 px-3 py-2 text-sm font-mono" />
+              <input type="text" value={maskSerial(item.serial_number)} disabled className="w-full rounded-lg border bg-gray-100 px-3 py-2 text-sm font-mono" />
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-600">สินค้า</label>

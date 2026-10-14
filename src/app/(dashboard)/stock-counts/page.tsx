@@ -33,6 +33,7 @@ import {
   AlertTriangle, Copy, Check, Link, Printer,
   Package, ScanBarcode, ChevronRight, ChevronDown,
 } from 'lucide-react';
+import { useSerialMask } from '@/hooks/useSerialMask';
 
 /* ─── Status / Type maps ─── */
 const STATUS_MAP: Record<string, { label: string; variant: 'gray' | 'info' | 'warning' | 'success' | 'danger' }> = {
@@ -72,6 +73,7 @@ export default function StockCountsPage() {
 }
 
 function StockCountsContent() {
+  const maskSerial = useSerialMask();
   /* ─── List state ─── */
   const [counts, setCounts] = useState<StockCount[]>([]);
   const [loading, setLoading] = useState(true);
@@ -417,7 +419,7 @@ function StockCountsContent() {
         if (item.serial_resolutions && item.serial_resolutions.length > 0) {
           serialRows = item.serial_resolutions.map((sr: { serial_number: string; resolution: string }) =>
             `<tr class="serial-row">
-              <td colspan="3" style="padding-left:40px;font-family:monospace;font-size:11px;color:#555;">↳ ${sr.serial_number}</td>
+              <td colspan="3" style="padding-left:40px;font-family:monospace;font-size:11px;color:#555;">↳ ${maskSerial(sr.serial_number)}</td>
               <td colspan="2" style="font-size:11px;">
                 <span class="badge badge-${sr.resolution === 'WRITE_OFF' ? 'red' : 'blue'}">${RESOLUTION_LABELS[sr.resolution] ?? sr.resolution}</span>
               </td>
@@ -445,7 +447,7 @@ function StockCountsContent() {
       const unexpectedRows = (d.unexpected_scans ?? []).length > 0
         ? (d.unexpected_scans ?? []).map((s: { serial_number: string; product: string; product_code: string; resolution: string | null; scanned_at: string }) =>
             `<tr>
-              <td style="font-family:monospace;font-size:12px;">${s.serial_number}</td>
+              <td style="font-family:monospace;font-size:12px;">${maskSerial(s.serial_number)}</td>
               <td>${s.product}<br/><span style="font-size:11px;color:#888;">${s.product_code}</span></td>
               <td class="text-center">
                 ${s.resolution ? `<span class="badge badge-${s.resolution === 'IMPORT' ? 'green' : 'gray'}">${RESOLUTION_LABELS[s.resolution] ?? s.resolution}</span>` : '<span class="badge badge-yellow">ยังไม่กำหนด</span>'}
@@ -964,7 +966,7 @@ function StockCountsContent() {
                   <tr><td colSpan={4} className="px-3 py-8 text-center text-gray-400">ไม่มีรายการ</td></tr>
                 ) : scans.map((s) => (
                   <tr key={s.id} className="hover:bg-gray-50">
-                    <td className="px-3 py-2 font-mono text-xs">{s.serial_number}</td>
+                    <td className="px-3 py-2 font-mono text-xs">{maskSerial(s.serial_number)}</td>
                     <td className="px-3 py-2">
                       {s.product ? (
                         <div>
@@ -1292,6 +1294,7 @@ function DetailView({
   onStart, onComplete, onCancel, onApprove, onViewScans, onCopyPdaUrl, onPrintReport,
   onResolveSerial, onResolveSerialBulk, onResolveScan, onResolveScanBulk, pdaTokens, copied, onReprintLabels,
 }: DetailViewProps) {
+  const maskSerial = useSerialMask();
   const statusInfo = STATUS_MAP[sc.status];
   const isInProgress = sc.status === 'IN_PROGRESS';
   const isCompleted = sc.status === 'COMPLETED';
@@ -1634,14 +1637,14 @@ function DetailView({
                               checked={selectedScanIds.has(scan.id)}
                               onChange={() => toggleSelectOne(scan.id)}
                               className="h-4 w-4 accent-blue-600"
-                              aria-label={`เลือก ${scan.serial_number}`}
+                              aria-label={`เลือก ${maskSerial(scan.serial_number)}`}
                             />
                           ) : (
                             <span className="inline-block h-4 w-4" />
                           )}
                         </td>
                       )}
-                      <td className="px-3 py-2 font-mono text-xs">{scan.serial_number}</td>
+                      <td className="px-3 py-2 font-mono text-xs">{maskSerial(scan.serial_number)}</td>
                       <td className="px-3 py-2">
                         {(scan.product || scan.resolution_product) ? (
                           <div>
@@ -1856,6 +1859,7 @@ function MissingSerialsRow({
   onReprintLabels?: (items: Inventory[]) => void;
   readOnly?: boolean;
 }) {
+  const maskSerial = useSerialMask();
   const [serials, setSerials] = useState<Array<Inventory & {
     serial_resolution?: { resolution: string } | null;
   }>>([]);
@@ -1975,11 +1979,11 @@ function MissingSerialsRow({
                   checked={selected.has(s.id)}
                   onChange={() => toggleSelectOne(s.id)}
                   className="h-4 w-4 accent-blue-600"
-                  aria-label={`เลือก ${s.serial_number}`}
+                  aria-label={`เลือก ${maskSerial(s.serial_number)}`}
                 />
               )}
               <span className="text-gray-300">└</span>
-              <span className="font-mono text-xs">{s.serial_number}</span>
+              <span className="font-mono text-xs">{maskSerial(s.serial_number)}</span>
               <Badge variant="gray">{s.status}</Badge>
               {onReprintLabels && (
                 <button

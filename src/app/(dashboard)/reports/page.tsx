@@ -13,6 +13,7 @@ import {
   Search, Download, Warehouse, TrendingDown, FileWarning,
   ClipboardList, ArrowRightLeft, ChevronDown, X, Filter, BarChart3,
 } from 'lucide-react';
+import { useSerialMask } from '@/hooks/useSerialMask';
 
 /* ─── Constants ─── */
 const TABS = [
@@ -446,6 +447,7 @@ function ReportTable({ tab, data, loading }: { tab: TabKey; data: any[]; loading
 /* ── Inventory Table ── */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function InventoryTable({ data }: { data: any[] }) {
+  const maskSerial = useSerialMask();
   const STATUS: Record<string, { label: string; variant: 'success' | 'danger' | 'warning' | 'info' | 'gray' }> = {
     PENDING: { label: 'รอรับเข้า', variant: 'warning' },
     IN_STOCK: { label: 'ในคลัง', variant: 'success' },
@@ -478,7 +480,7 @@ function InventoryTable({ data }: { data: any[] }) {
           const c = COND[r.condition] || { label: r.condition, variant: 'success' as const };
           return (
             <tr key={r.id || i} className="border-t hover:bg-gray-50">
-              <td className="px-3 py-2 font-mono text-xs font-medium">{r.serial_number}</td>
+              <td className="px-3 py-2 font-mono text-xs font-medium">{maskSerial(r.serial_number)}</td>
               <td className="px-3 py-2">
                 <div className="font-medium">{r.product?.name || '-'}</div>
                 <div className="text-xs text-gray-400">{r.product?.product_code}</div>
@@ -661,6 +663,7 @@ function ProductionTable({ data }: { data: any[] }) {
 /* ── Movements Table ── */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function MovementsTable({ data }: { data: any[] }) {
+  const maskSerial = useSerialMask();
   const TYPE: Record<string, { label: string; color: string }> = {
     PRODUCTION_IN: { label: 'ผลิตเข้าคลัง', color: 'text-green-700 bg-green-50' },
     TRANSFER:      { label: 'ย้ายคลัง', color: 'text-blue-700 bg-blue-50' },
@@ -691,7 +694,7 @@ function MovementsTable({ data }: { data: any[] }) {
           return (
             <tr key={r.id || i} className="border-t hover:bg-gray-50">
               <td className="px-3 py-2 text-xs text-gray-500">{r.created_at ? new Date(r.created_at).toLocaleString('th-TH') : '-'}</td>
-              <td className="px-3 py-2 font-mono text-xs font-medium">{r.inventory?.serial_number || '-'}</td>
+              <td className="px-3 py-2 font-mono text-xs font-medium">{maskSerial(r.inventory?.serial_number) || '-'}</td>
               <td className="px-3 py-2">
                 <div className="text-xs">{r.inventory?.product?.name || '-'}</div>
                 <div className="text-xs text-gray-400">{r.inventory?.product?.product_code}</div>
